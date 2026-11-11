@@ -1,0 +1,3 @@
+Versao antiga com API em Cloud Functions + Storage.
+So funciona no plano Blaze (pago conforme uso). NAO e usada pelo site atual.
+Guardada apenas como referencia para o Projeto Integrador.

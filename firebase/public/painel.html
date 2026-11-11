@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel CRM • Agiliza Saúde</title>
+    <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+    <link rel="icon" href="img/icone-192.png" sizes="192x192" type="image/png">
+    <link rel="apple-touch-icon" href="img/icone-180.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#0a3d62">
+    <meta name="robots" content="noindex">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background: #f8fafc; color: #334155; }
+        .navbar-custom { background-color: #0a3d62; border-bottom: 3px solid #00a8ff; }
+        .cartao-numero { font-size: 1.8rem; font-weight: 700; }
+        /* Comprovante do atendimento presencial: ao imprimir, só ele aparece */
+        #comprovante { display: none; }
+        @media print {
+            body > *:not(#comprovante) { display: none !important; }
+            #comprovante { display: block !important; color: #000; font-size: 14px; max-width: 520px; margin: 0 auto; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark navbar-custom">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold" href="index.html">
+                <img src="img/logo.svg" alt="" width="34" height="34" class="me-2">Agiliza Saúde • Painel CRM
+            </a>
+            <div class="d-flex align-items-center gap-3 text-white">
+                <span class="small"><i class="bi bi-person-badge me-1"></i><span id="nomeUsuario">...</span>
+                    <span class="badge bg-info text-dark ms-1" id="perfilUsuario"></span></span>
+                <button class="btn btn-outline-light btn-sm" onclick="sair()">
+                    <i class="bi bi-box-arrow-right me-1"></i>Sair
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container-fluid px-4 py-4 d-none" id="conteudo">
+        <!-- Resumo -->
+        <div class="row g-3 mb-3" id="resumo"></div>
+
+        <ul class="nav nav-tabs mb-3" role="tablist">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#abaSolicitacoes" type="button">
+                <i class="bi bi-list-check me-1"></i>Solicitações</button></li>
+            <li class="nav-item"><button class="nav-link fw-semibold text-success" data-bs-toggle="tab" data-bs-target="#abaBalcao" type="button" id="abaBalcaoBtn">
+                <i class="bi bi-person-plus me-1"></i>Atendimento presencial</button></li>
+            <li class="nav-item"><button class="nav-link fw-semibold text-primary" data-bs-toggle="tab" data-bs-target="#abaAgendas" type="button" onclick="carregarAgendas()">
+                <i class="bi bi-calendar3 me-1"></i>Agendas e médicos</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#abaRelatorios" type="button" onclick="desenharRelatorios()">
+                <i class="bi bi-bar-chart-line me-1"></i>Relatórios</button></li>
+            <li class="nav-item d-none" id="itemAbaServidores"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#abaServidores" type="button" onclick="carregarServidores()">
+                <i class="bi bi-people me-1"></i>Servidores <span class="badge bg-danger d-none" id="qtdPendentes"></span></button></li>
+        </ul>
+
+        <div class="tab-content">
+            <!-- SOLICITAÇÕES -->
+            <div class="tab-pane fade show active" id="abaSolicitacoes">
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-body">
+                        <form class="row g-2 align-items-end" onsubmit="event.preventDefault(); desenhar();">
+                            <div class="col-12 col-md-3">
+                                <label for="filtroBusca" class="form-label small fw-bold">Buscar (protocolo, nome, CPF ou Cartão SUS)</label>
+                                <input type="text" id="filtroBusca" class="form-control" maxlength="60" oninput="desenhar()">
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label for="filtroStatus" class="form-label small fw-bold">Status</label>
+                                <select id="filtroStatus" class="form-select" onchange="desenhar()"><option value="">Todos</option></select>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label for="filtroPrioridade" class="form-label small fw-bold">Prioridade</label>
+                                <select id="filtroPrioridade" class="form-select" onchange="desenhar()"><option value="">Todas</option></select>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label for="filtroUbs" class="form-label small fw-bold">UBS</label>
+                                <select id="filtroUbs" class="form-select" onchange="desenhar()"><option value="">Todas</option></select>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label for="filtroEspera" class="form-label small fw-bold">Tempo de espera</label>
+                                <select id="filtroEspera" class="form-select" onchange="desenhar()">
+                                    <option value="">Todos</option>
+                                    <option value="15">Em aberto há 15+ dias</option>
+                                    <option value="30">Em aberto há 30+ dias</option>
+                                    <option value="60">Em aberto há 60+ dias</option>
+                                </select>
+                            </div>
+                            <div class="col-9 col-md-2">
+                                <label for="ordenar" class="form-label small fw-bold">Ordenar</label>
+                                <select id="ordenar" class="form-select" onchange="desenhar()">
+                                    <option value="fila">Fila: prioridade + espera</option>
+                                    <option value="recentes">Pedidos mais recentes</option>
+                                    <option value="antigos">Pedidos mais antigos</option>
+                                </select>
+                            </div>
+                            <div class="col-3 col-md-1">
+                                <button type="button" class="btn btn-outline-primary w-100" title="Recarregar" onclick="carregar()"><i class="bi bi-arrow-clockwise"></i></button>
+                            </div>
+                            <div class="col-12 small text-muted">
+                                Espera: <span class="badge bg-success">até 14 dias</span>
+                                <span class="badge bg-warning text-dark">15 a 29 dias</span>
+                                <span class="badge bg-danger">30 dias ou mais</span>
+                                — conta da data do pedido até hoje (pedidos em aberto) ou até a marcação/finalização.
+                                <br><i class="bi bi-eye-slash me-1"></i><strong>Prioridade é interna:</strong> só a equipe vê; o cidadão não vê no site nem na consulta.
+                                A fila coloca em aberto primeiro, por prioridade (Urgente → Prioritário → Normal) e, dentro dela, quem espera há mais tempo.
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="avisoPainel" class="alert d-none" role="alert"></div>
+
+                <div class="card border-0 shadow-sm">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Prioridade</th><th>Protocolo</th><th>Paciente</th><th>Serviço</th><th>UBS</th>
+                                    <th>Status</th><th>Data do pedido</th><th>Tempo de espera</th><th class="text-end">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="corpoTabela"><tr><td colspan="9" class="text-center text-muted py-4">Carregando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2">
+                    <span class="small text-muted" id="infoCarregados"></span>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary btn-sm d-none" id="btnCarregarMais" onclick="carregarMais()">
+                            <i class="bi bi-chevron-double-down me-1"></i>Carregar mais pedidos</button>
+                        <button class="btn btn-success btn-sm" onclick="exportarCsv()">
+                            <i class="bi bi-file-earmark-spreadsheet me-1"></i>Exportar para Excel (CSV)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ATENDIMENTO PRESENCIAL (BALCÃO): passo 1 CPF → passo 2 pedido → passo 3 comprovante -->
+            <div class="tab-pane fade" id="abaBalcao">
+                <div class="row g-3 justify-content-center">
+                    <div class="col-12 col-xl-9">
+                        <div class="alert alert-success small mb-3">
+                            <i class="bi bi-info-circle me-1"></i>Para quem foi <strong>pessoalmente</strong> à UBS (idosos, pessoas sem celular ou internet).
+                            A pessoa <strong>não precisa de e-mail</strong>: depois ela (ou um familiar) acompanha pelo <strong>CPF</strong> no site.
+                        </div>
+
+                        <!-- PASSO 1 -->
+                        <div class="card border-0 shadow-sm mb-3">
+                            <div class="card-body">
+                                <h5 class="fw-bold mb-3"><span class="badge bg-success rounded-pill me-2">1</span>Quem está sendo atendido?</h5>
+                                <form class="row g-2 align-items-end" onsubmit="event.preventDefault(); balcaoBuscar();">
+                                    <div class="col-12 col-md-6">
+                                        <label for="balCpf" class="form-label fw-bold">CPF da pessoa</label>
+                                        <input type="text" id="balCpf" class="form-control form-control-lg" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" required autocomplete="off">
+                                    </div>
+                                    <div class="col-12 col-md-3">
+                                        <button type="submit" class="btn btn-success btn-lg w-100"><i class="bi bi-search me-1"></i>Buscar</button>
+                                    </div>
+                                    <div class="col-12 col-md-3">
+                                        <button type="button" class="btn btn-outline-secondary btn-lg w-100" onclick="balcaoNovo()">Limpar</button>
+                                    </div>
+                                </form>
+                                <div id="balResultado" class="mt-3"></div>
+
+                                <!-- cadastro rápido (aparece quando o CPF não tem cadastro) -->
+                                <form id="balCadastro" class="row g-2 mt-1 d-none" onsubmit="event.preventDefault();">
+                                    <div class="col-12 col-md-6">
+                                        <label for="balNome" class="form-label fw-bold">Nome completo</label>
+                                        <input type="text" id="balNome" class="form-control" maxlength="120">
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <label for="balNasc" class="form-label fw-bold">Nascimento</label>
+                                        <input type="date" id="balNasc" class="form-control">
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <label for="balTel" class="form-label fw-bold">Telefone <span class="fw-normal text-muted">(opcional)</span></label>
+                                        <input type="tel" id="balTel" class="form-control" placeholder="(61) 98712-3456" maxlength="16">
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label for="balSus" class="form-label fw-bold">Cartão SUS <span class="fw-normal text-muted">(opcional)</span></label>
+                                        <input type="text" id="balSus" class="form-control" placeholder="000.0000.0000.0000" inputmode="numeric" maxlength="19">
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check p-3 bg-light rounded border">
+                                            <input class="form-check-input ms-0 me-2" type="checkbox" id="balLgpd">
+                                            <label class="form-check-label small" for="balLgpd">
+                                                <strong>Li para a pessoa e ela autorizou</strong> o uso dos seus dados de identificação e saúde para agendamento
+                                                e triagem na rede municipal (LGPD - Lei nº 13.709/2018).
+                                            </label>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- PASSO 2 -->
+                        <div class="card border-0 shadow-sm mb-3 d-none" id="balPasso2">
+                            <div class="card-body">
+                                <h5 class="fw-bold mb-3"><span class="badge bg-success rounded-pill me-2">2</span>O que a pessoa precisa?</h5>
+                                <div class="row g-2">
+                                    <div class="col-12 col-md-6">
+                                        <label for="balServico" class="form-label fw-bold">Serviço</label>
+                                        <select id="balServico" class="form-select form-select-lg" onchange="balcaoServico()"></select>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label for="balUbs" class="form-label fw-bold">UBS de referência</label>
+                                        <select id="balUbs" class="form-select form-select-lg"></select>
+                                    </div>
+
+                                    <!-- só para cirurgia eletiva -->
+                                    <div class="col-12 d-none" id="balCirurgia">
+                                        <div class="border rounded-3 p-3" style="background:#eef6ff;">
+                                            <h6 class="fw-bold text-primary"><i class="bi bi-hospital me-1"></i>Dados da cirurgia</h6>
+                                            <div class="row g-2">
+                                                <div class="col-12 col-md-6">
+                                                    <label for="balProcedimento" class="form-label small fw-bold">Procedimento (conforme o encaminhamento)</label>
+                                                    <input type="text" id="balProcedimento" class="form-control" maxlength="160" list="listaProcedimentos" placeholder="Ex.: Catarata - olho direito">
+                                                    <datalist id="listaProcedimentos"></datalist>
+                                                </div>
+                                                <div class="col-12 col-md-6">
+                                                    <label for="balHospital" class="form-label small fw-bold">Hospital de referência</label>
+                                                    <input type="text" id="balHospital" class="form-control" maxlength="160" list="listaHospitais">
+                                                    <datalist id="listaHospitais"></datalist>
+                                                </div>
+                                                <div class="col-12 small">
+                                                    <span class="fw-bold">Pré-operatório já feito:</span>
+                                                    <span id="balPreOp"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-12 col-md-6">
+                                        <label for="balGuia" class="form-label fw-bold">Foto da guia/encaminhamento <span class="fw-normal text-muted">(opcional)</span></label>
+                                        <input type="file" id="balGuia" class="form-control" accept="image/*,application/pdf" capture="environment">
+                                        <div class="form-text">No celular/tablet abre a câmera.</div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <label for="balPrioridade" class="form-label fw-bold">Prioridade <span class="badge bg-dark">interno</span></label>
+                                        <select id="balPrioridade" class="form-select"></select>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <label for="balMotivo" class="form-label fw-bold">Motivo</label>
+                                        <input type="text" id="balMotivo" class="form-control" maxlength="200" list="listaMotivos">
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="balObs" class="form-label fw-bold">Observação interna <span class="fw-normal text-muted">(opcional)</span></label>
+                                        <input type="text" id="balObs" class="form-control" maxlength="300" placeholder="Ex.: veio acompanhada da filha; trouxe exames antigos">
+                                    </div>
+                                </div>
+                                <div id="balErro" class="alert alert-danger py-2 small d-none mt-3"></div>
+                                <button type="button" class="btn btn-success btn-lg w-100 mt-3 fw-bold" id="balBtnRegistrar" onclick="balcaoRegistrar()">
+                                    <i class="bi bi-check2-circle me-1"></i>Registrar pedido
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- PASSO 3 -->
+                        <div class="card border-success shadow-sm d-none" id="balPasso3">
+                            <div class="card-body text-center">
+                                <h5 class="fw-bold text-success"><span class="badge bg-success rounded-pill me-2">3</span>Pedido registrado!</h5>
+                                <div class="display-6 fw-bold my-2" id="balProtocolo"></div>
+                                <p class="text-muted small mb-3">Entregue o comprovante. Para acompanhar: site do Agiliza Saúde → "Acompanhar Solicitação" → CPF.</p>
+                                <div class="d-flex flex-wrap justify-content-center gap-2">
+                                    <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir comprovante</button>
+                                    <button class="btn btn-success" id="balBtnWpp" onclick="balcaoWhatsApp()"><i class="bi bi-whatsapp me-1"></i>Enviar no WhatsApp</button>
+                                    <button class="btn btn-outline-secondary" onclick="balcaoNovo()"><i class="bi bi-person-plus me-1"></i>Próximo atendimento</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AGENDAS E MÉDICOS: oferta de vagas (profissionais com agenda semanal + agendas avulsas/mutirões) -->
+            <div class="tab-pane fade" id="abaAgendas">
+                <div class="alert alert-primary small">
+                    <i class="bi bi-info-circle me-1"></i><strong>Como funciona:</strong>
+                    1) cadastre o <strong>profissional</strong> com os dias e horários em que atende;
+                    2) clique em <strong>Gerar agendas</strong> (cria as vagas das próximas semanas) ou crie uma <strong>agenda avulsa</strong> (mutirão);
+                    3) abra a agenda e clique em <strong>Preencher com a fila</strong>: o sistema sugere os próximos da fila
+                    (prioridade + tempo de espera) e você confirma. <span id="avisoSoLeitura" class="d-none fw-bold">Seu perfil só pode visualizar.</span>
+                </div>
+                <div id="avisoAgendas" class="alert d-none" role="alert"></div>
+                <div class="row g-3">
+                    <!-- Profissionais -->
+                    <div class="col-12 col-xl-5">
+                        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold mb-0"><i class="bi bi-person-vcard me-1"></i>Profissionais</h6>
+                                <button class="btn btn-sm btn-primary so-regulador" onclick="novoProfissional()"><i class="bi bi-plus-lg me-1"></i>Novo</button>
+                            </div>
+                            <form id="formProfissional" class="collapse border rounded-3 p-2 mb-2 bg-light" onsubmit="event.preventDefault(); salvarProfissional();">
+                                <input type="hidden" id="profId">
+                                <div class="fw-bold small text-primary mb-1" id="tituloFormProf">Novo profissional</div>
+                                <div class="row g-2">
+                                    <div class="col-12 col-md-7"><label class="form-label small fw-bold" for="profNome">Nome</label><input id="profNome" class="form-control form-control-sm" maxlength="120" placeholder="Dra. Ana Lima" required></div>
+                                    <div class="col-12 col-md-5"><label class="form-label small fw-bold" for="profRegistro">CRM/COREN</label><input id="profRegistro" class="form-control form-control-sm" maxlength="40"></div>
+                                    <div class="col-12 col-md-6"><label class="form-label small fw-bold" for="profEspecialidade">Especialidade</label><input id="profEspecialidade" class="form-control form-control-sm" maxlength="80" list="listaEspecialidades" required></div>
+                                    <div class="col-12 col-md-6"><label class="form-label small fw-bold" for="profServico">Atende pedidos de</label><select id="profServico" class="form-select form-select-sm"></select></div>
+                                    <div class="col-12"><label class="form-label small fw-bold" for="profLocal">Local de atendimento</label><input id="profLocal" class="form-control form-control-sm" maxlength="160" list="listaLocaisAgenda" required></div>
+                                    <div class="col-12 small"><span class="fw-bold">Dias:</span> <span id="profDias"></span></div>
+                                    <div class="col-4"><label class="form-label small fw-bold" for="profInicio">Início</label><input id="profInicio" type="time" class="form-control form-control-sm" value="07:00" required></div>
+                                    <div class="col-4"><label class="form-label small fw-bold" for="profFim">Fim</label><input id="profFim" type="time" class="form-control form-control-sm" value="11:00" required></div>
+                                    <div class="col-4"><label class="form-label small fw-bold" for="profDuracao">Min/paciente</label><input id="profDuracao" type="number" min="5" max="240" class="form-control form-control-sm" value="20" required></div>
+                                    <div class="col-12 small fw-bold mt-2"><i class="bi bi-airplane me-1"></i>Férias / afastamento <span class="fw-normal text-muted">(opcional — nesses dias não gera agenda)</span></div>
+                                    <div class="col-6 col-md-4"><label class="form-label small" for="profFeriasIni">De</label><input id="profFeriasIni" type="date" class="form-control form-control-sm"></div>
+                                    <div class="col-6 col-md-4"><label class="form-label small" for="profFeriasFim">Até</label><input id="profFeriasFim" type="date" class="form-control form-control-sm"></div>
+                                    <div class="col-12 col-md-4"><label class="form-label small" for="profFeriasMotivo">Motivo</label><input id="profFeriasMotivo" class="form-control form-control-sm" maxlength="80" list="listaMotivosAfast" placeholder="Férias"></div>
+                                    <datalist id="listaMotivosAfast"><option value="Férias"><option value="Licença médica"><option value="Licença-maternidade"><option value="Congresso / curso"><option value="Afastamento"></datalist>
+                                    <div class="col-12 d-flex gap-2">
+                                        <button class="btn btn-primary btn-sm flex-grow-1" type="submit" id="btnSalvarProf">Salvar profissional</button>
+                                        <button class="btn btn-light btn-sm" type="button" onclick="bootstrap.Collapse.getOrCreateInstance(document.getElementById('formProfissional')).hide()">Cancelar</button>
+                                    </div>
+                                </div>
+                            </form>
+                            <div id="listaProfissionais" class="small text-muted">Carregando...</div>
+                            <!-- quem não trabalha mais: fica guardado (adormecido), pode ser reativado -->
+                            <details id="blocoInativos" class="small mt-2 d-none">
+                                <summary class="fw-bold text-muted"><i class="bi bi-moon me-1"></i>Desativados (<span id="qtdInativos">0</span>) — dados guardados</summary>
+                                <div id="listaInativos" class="mt-2"></div>
+                            </details>
+                        </div></div>
+                    </div>
+                    <!-- Agendas -->
+                    <div class="col-12 col-xl-7">
+                        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                <h6 class="fw-bold mb-0" id="tituloAgendas"><i class="bi bi-calendar-week me-1"></i>Agenda</h6>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-outline-primary text-nowrap so-regulador" data-bs-toggle="collapse" data-bs-target="#formAgenda"><i class="bi bi-plus-lg me-1"></i>Agenda avulsa</button>
+                                </div>
+                            </div>
+                            <form id="formAgenda" class="collapse border rounded-3 p-2 mb-2 bg-light" onsubmit="event.preventDefault(); criarAgendaAvulsa();">
+                                <div class="row g-2">
+                                    <div class="col-12 col-md-6"><label class="form-label small fw-bold" for="agServico">Serviço</label><select id="agServico" class="form-select form-select-sm"></select></div>
+                                    <div class="col-12 col-md-6"><label class="form-label small fw-bold" for="agLocalAvulsa">Local</label><input id="agLocalAvulsa" class="form-control form-control-sm" maxlength="160" list="listaLocaisAgenda" required></div>
+                                    <div class="col-6 col-md-3"><label class="form-label small fw-bold" for="agDataAvulsa">Data</label><input id="agDataAvulsa" type="date" class="form-control form-control-sm" required></div>
+                                    <div class="col-6 col-md-3"><label class="form-label small fw-bold" for="agInicioAvulsa">Início</label><input id="agInicioAvulsa" type="time" class="form-control form-control-sm" value="07:00" required></div>
+                                    <div class="col-6 col-md-3"><label class="form-label small fw-bold" for="agIntervalo">Min/paciente</label><input id="agIntervalo" type="number" min="0" max="240" class="form-control form-control-sm" value="15" required></div>
+                                    <div class="col-6 col-md-3"><label class="form-label small fw-bold" for="agVagas">Vagas</label><input id="agVagas" type="number" min="1" max="200" class="form-control form-control-sm" value="20" required></div>
+                                    <div class="col-12"><label class="form-label small fw-bold" for="agOrient">Orientações (opcional)</label><input id="agOrient" class="form-control form-control-sm" maxlength="500" placeholder="Ex.: jejum de 8 horas; levar exames anteriores"></div>
+                                    <div class="col-12"><button class="btn btn-primary btn-sm w-100" type="submit">Criar agenda (mutirão)</button></div>
+                                </div>
+                            </form>
+                            <div id="listaAgendas" class="small text-muted">Carregando...</div>
+                        </div></div>
+                    </div>
+                </div>
+                <datalist id="listaEspecialidades"></datalist>
+                <datalist id="listaLocaisAgenda"></datalist>
+            </div>
+
+            <!-- RELATÓRIOS -->
+            <div class="tab-pane fade" id="abaRelatorios">
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-body row g-2 align-items-end">
+                        <div class="col-6 col-md-3">
+                            <label for="relPeriodo" class="form-label small fw-bold">Período (data do pedido)</label>
+                            <select id="relPeriodo" class="form-select" onchange="desenharRelatorios()">
+                                <option value="30">Últimos 30 dias</option>
+                                <option value="90" selected>Últimos 90 dias</option>
+                                <option value="365">Últimos 12 meses</option>
+                                <option value="0">Todo o período</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="relUbs" class="form-label small fw-bold">UBS</label>
+                            <select id="relUbs" class="form-select" onchange="desenharRelatorios()"><option value="">Todas</option></select>
+                        </div>
+                        <div class="col-12 col-md-6 small text-muted" id="relBase"></div>
+                    </div>
+                </div>
+                <div class="row g-3 mb-3" id="relNumeros"></div>
+                <div class="row g-3">
+                    <div class="col-12 col-xl-6"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <h6 class="fw-bold">Pedidos por mês</h6><div style="height:260px"><canvas id="grafMes" role="img" aria-label="Pedidos por mês"></canvas></div>
+                    </div></div></div>
+                    <div class="col-12 col-xl-6"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <h6 class="fw-bold">Situação dos pedidos</h6><div style="height:260px"><canvas id="grafStatus" role="img" aria-label="Pedidos por situação"></canvas></div>
+                    </div></div></div>
+                    <div class="col-12 col-xl-6"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <h6 class="fw-bold">Pedidos por UBS</h6><div style="height:260px"><canvas id="grafUbs" role="img" aria-label="Pedidos por UBS"></canvas></div>
+                    </div></div></div>
+                    <div class="col-12 col-xl-6"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <h6 class="fw-bold">Pedidos por serviço</h6><div style="height:260px"><canvas id="grafServico" role="img" aria-label="Pedidos por serviço"></canvas></div>
+                    </div></div></div>
+                    <div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body">
+                        <h6 class="fw-bold mb-0">Tempo médio de espera por serviço (dias)</h6>
+                        <div class="small text-muted mb-2">Em aberto: até hoje. Marcados/finalizados: até a marcação ou finalização.</div>
+                        <div style="height:240px"><canvas id="grafEspera" role="img" aria-label="Espera média por serviço"></canvas></div>
+                    </div></div></div>
+                    <div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body">
+                        <details><summary class="fw-bold">Ver os números em tabela</summary>
+                            <div class="table-responsive mt-2" id="relTabela"></div></details>
+                    </div></div></div>
+                </div>
+            </div>
+
+            <!-- SERVIDORES (somente ADMIN) -->
+            <div class="tab-pane fade" id="abaServidores">
+                <div id="avisoServidores" class="alert d-none" role="alert"></div>
+                <div class="card border-0 shadow-sm">
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead class="table-light">
+                                <tr><th>Nome</th><th>E-mail</th><th>Matrícula</th><th>Pedido em</th><th>Perfil</th><th>Situação</th><th class="text-end">Ações</th></tr>
+                            </thead>
+                            <tbody id="corpoServidores"><tr><td colspan="7" class="text-center text-muted py-4">Carregando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+                <p class="small text-muted mt-2">
+                    <strong>Atendente:</strong> Recebida, Em Triagem, Em Regulação, Cancelada •
+                    <strong>Regulador:</strong> também Agendada, Concluída, Não autorizada •
+                    <strong>Administrador:</strong> tudo + aprova servidores.
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <div class="container py-5 text-center d-none" id="semAcesso">
+        <i class="bi bi-shield-x fs-1 text-danger"></i>
+        <h4 class="mt-2" id="semAcessoTitulo">Acesso não autorizado</h4>
+        <p class="text-muted" id="semAcessoTexto"></p>
+        <a href="index.html" class="btn btn-primary">Voltar ao site</a>
+    </div>
+
+    <!-- Modal de atualização de status -->
+    <div class="modal fade" id="modalStatus" tabindex="-1" aria-labelledby="tituloModalStatus" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="tituloModalStatus">Atualizar solicitação</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <form onsubmit="event.preventDefault(); salvarStatus();">
+                    <div class="modal-body">
+                        <div class="small mb-2" id="resumoModal"></div>
+                        <div class="small mb-3" id="docsModal"></div>
+                        <!-- Cirurgia eletiva: checklist do pré-operatório (só aparece em pedidos de cirurgia) -->
+                        <div class="border rounded-3 p-2 mb-3 d-none" id="cirurgiaModal" style="background:#eef6ff;"></div>
+                        <!-- Aviso por WhatsApp (demonstração: "clique para conversar", envio manual) -->
+                        <details class="border rounded-3 p-2 mb-3" style="background:#f0fdf4;">
+                            <summary class="fw-bold small text-success"><i class="bi bi-whatsapp me-1"></i>Avisar o paciente pelo WhatsApp</summary>
+                            <textarea id="msgWhatsapp" class="form-control form-control-sm mt-2" rows="5" maxlength="1000"></textarea>
+                            <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                                <button type="button" class="btn btn-success btn-sm" onclick="abrirWhatsApp()">
+                                    <i class="bi bi-whatsapp me-1"></i>Abrir no WhatsApp</button>
+                                <span class="small text-muted" id="numeroWhatsapp"></span>
+                            </div>
+                            <div class="form-text">Abre o WhatsApp Web/app com o número e a mensagem prontos; o servidor confere e clica em enviar.
+                                Dica: salve o status primeiro para a mensagem sair atualizada.</div>
+                        </details>
+                        <!-- Prioridade interna: gravada em triagem/{protocolo}, só servidores leem -->
+                        <div class="border rounded-3 p-3 mb-3" style="background:#fff8e6;">
+                            <h6 class="fw-bold mb-2"><i class="bi bi-sort-up me-1"></i>Prioridade na fila
+                                <span class="badge bg-dark ms-1"><i class="bi bi-eye-slash me-1"></i>interno — o cidadão não vê</span></h6>
+                            <div class="row g-2">
+                                <div class="col-12 col-md-4">
+                                    <label for="novaPrioridade" class="form-label small fw-bold">Prioridade</label>
+                                    <select id="novaPrioridade" class="form-select"></select>
+                                </div>
+                                <div class="col-12 col-md-8">
+                                    <label for="motivoPrioridade" class="form-label small fw-bold">Motivo (interno)</label>
+                                    <input type="text" id="motivoPrioridade" class="form-control" maxlength="200" list="listaMotivos"
+                                           placeholder="Ex.: Idoso 80+, gestante, oncologia, risco clínico">
+                                    <datalist id="listaMotivos"></datalist>
+                                </div>
+                                <div class="col-12 small text-muted" id="infoPrioridade"></div>
+                            </div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label for="novoStatus" class="form-label small fw-bold">Novo status</label>
+                                <select id="novoStatus" class="form-select" required onchange="sugerirMensagem()"></select>
+                            </div>
+                            <!-- Marcação: aparece quando o status é "Agendada" -->
+                            <div class="col-12 d-none" id="blocoAgenda">
+                                <div class="border rounded-3 p-3 bg-light">
+                                    <h6 class="fw-bold text-primary mb-2"><i class="bi bi-calendar-plus me-1"></i>Dados da marcação</h6>
+                                    <!-- 1) Escolher na agenda: médico -> dia -> horário (só aparecem dias e horários livres de verdade) -->
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-12 col-md-5">
+                                            <label for="mkProf" class="form-label small fw-bold">1. Quem vai atender</label>
+                                            <select id="mkProf" class="form-select" onchange="seletorMudouProf('mk')"></select>
+                                        </div>
+                                        <div class="col-7 col-md-4">
+                                            <label for="mkDia" class="form-label small fw-bold">2. Dia</label>
+                                            <select id="mkDia" class="form-select" onchange="seletorMudouDia('mk')"></select>
+                                        </div>
+                                        <div class="col-5 col-md-3">
+                                            <label for="mkHora" class="form-label small fw-bold">3. Horário</label>
+                                            <select id="mkHora" class="form-select" onchange="seletorMudouHora('mk')"></select>
+                                        </div>
+                                        <div class="col-12 small" id="mkResumo"></div>
+                                    </div>
+                                    <a class="small" data-bs-toggle="collapse" href="#marcacaoManual" role="button">Ou digitar a marcação à mão (sem usar a agenda)</a>
+                                    <div class="row g-2 collapse mt-1" id="marcacaoManual">
+                                        <div class="col-6 col-md-3">
+                                            <label for="agData" class="form-label small fw-bold">Data</label>
+                                            <input type="date" id="agData" class="form-control" oninput="sugerirMensagem()">
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <label for="agHora" class="form-label small fw-bold">Horário</label>
+                                            <input type="time" id="agHora" class="form-control" oninput="sugerirMensagem()">
+                                        </div>
+                                        <div class="col-12 col-md-6">
+                                            <label for="agLocal" class="form-label small fw-bold">Local (unidade / clínica / hospital)</label>
+                                            <input type="text" id="agLocal" class="form-control" list="listaLocais" maxlength="160" oninput="sugerirMensagem()">
+                                            <datalist id="listaLocais"></datalist>
+                                        </div>
+                                        <div class="col-12 col-md-6">
+                                            <label for="agProfissional" class="form-label small fw-bold">Profissional / especialidade (opcional)</label>
+                                            <input type="text" id="agProfissional" class="form-control" maxlength="120" placeholder="Ex.: Cardiologia - Dra. Ana">
+                                        </div>
+                                        <div class="col-12 col-md-6">
+                                            <label for="agOrientacoes" class="form-label small fw-bold">Orientações ao paciente (opcional)</label>
+                                            <input type="text" id="agOrientacoes" class="form-control" maxlength="500" placeholder="Ex.: jejum de 8 horas">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label for="msgPublica" class="form-label small fw-bold">Mensagem ao munícipe</label>
+                                <textarea id="msgPublica" class="form-control" rows="2" maxlength="500"></textarea>
+                                <div class="form-text">Aparece para o munícipe na consulta e na Minha Área. Ex.: "Consulta dia 30/10 às 8h na UBS Centro".</div>
+                            </div>
+                            <div class="col-12">
+                                <label for="obsInterna" class="form-label small fw-bold">Observação interna (não aparece ao munícipe)</label>
+                                <textarea id="obsInterna" class="form-control" rows="2" maxlength="500"></textarea>
+                            </div>
+                        </div>
+                        <div id="erroModal" class="alert alert-danger py-2 small d-none mt-3"></div>
+                        <h6 class="fw-bold mt-4 mb-2"><i class="bi bi-clock-history me-1"></i>Histórico</h6>
+                        <div id="historicoModal" class="small text-muted">Carregando...</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="btnSalvarStatus">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Janela da AGENDA: vagas do dia, preencher com a fila, liberar, imprimir lista -->
+    <div class="modal fade" id="modalAgenda" tabindex="-1" aria-labelledby="tituloAgenda" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="tituloAgenda">Agenda</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="small mb-2" id="agendaInfo"></div>
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <button class="btn btn-success btn-sm so-regulador" onclick="preencherComFila()"><i class="bi bi-magic me-1"></i>Preencher com a fila</button>
+                        <button class="btn btn-primary btn-sm d-none" id="btnConfirmarMarcacoes" onclick="confirmarMarcacoes()"><i class="bi bi-check2-all me-1"></i>Confirmar marcações</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="imprimirListaDia()"><i class="bi bi-printer me-1"></i>Imprimir lista do dia</button>
+                        <button class="btn btn-outline-danger btn-sm ms-auto so-regulador" onclick="apagarAgenda(agendaAberta.id)"><i class="bi bi-trash me-1"></i>Apagar esta agenda</button>
+                    </div>
+                    <div id="avisoAgenda" class="alert d-none py-2 small" role="alert"></div>
+                    <!-- Reagendar: mover o paciente para outro médico / dia / horário -->
+                    <div id="painelReagendar" class="border border-primary rounded-3 p-2 mb-2 bg-primary-subtle d-none">
+                        <div class="fw-bold small mb-1"><i class="bi bi-arrow-left-right me-1"></i>Reagendar <span id="rgPaciente"></span></div>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-12 col-md-4"><label for="rgProf" class="form-label small fw-bold mb-0">Quem vai atender</label>
+                                <select id="rgProf" class="form-select form-select-sm" onchange="seletorMudouProf('rg')"></select></div>
+                            <div class="col-7 col-md-3"><label for="rgDia" class="form-label small fw-bold mb-0">Dia</label>
+                                <select id="rgDia" class="form-select form-select-sm" onchange="seletorMudouDia('rg')"></select></div>
+                            <div class="col-5 col-md-2"><label for="rgHora" class="form-label small fw-bold mb-0">Horário</label>
+                                <select id="rgHora" class="form-select form-select-sm" onchange="seletorMudouHora('rg')"></select></div>
+                            <div class="col-12 col-md-3 d-flex gap-1">
+                                <button class="btn btn-primary btn-sm flex-grow-1" id="btnReagendar" onclick="confirmarReagendar()">Confirmar</button>
+                                <button class="btn btn-light btn-sm" onclick="document.getElementById('painelReagendar').classList.add('d-none')">Cancelar</button>
+                            </div>
+                            <div class="col-12 small" id="rgResumo"></div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light"><tr><th style="width:70px">Horário</th><th>Paciente</th><th>Prioridade / espera</th><th class="text-end">Ações</th></tr></thead>
+                            <tbody id="corpoVagas"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FICHA 360° DO PACIENTE -->
+    <div class="modal fade" id="modalFicha" tabindex="-1" aria-labelledby="tituloFicha" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="tituloFicha"><i class="bi bi-person-lines-fill me-1"></i>Ficha do paciente</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body" id="corpoFicha">Carregando...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comprovante impresso no atendimento presencial (preenchido pelo painel.js) -->
+    <div id="comprovante"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="js/firebase-init.js"></script>
+    <script src="js/comum.js"></script>
+    <script src="js/painel.js"></script>
+</body>
+</html>

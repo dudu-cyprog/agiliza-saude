@@ -1,0 +1,27 @@
+# dependencias e arquivos gerados
+node_modules/
+target/
+emulator-data/
+.firebase/
+*.log
+*.zip
+
+# Eclipse (gerados ao importar o projeto Maven)
+.settings/
+.classpath
+.project
+
+# segredos: NUNCA enviar
+serviceAccount*.json
+*firebase-adminsdk*.json
+.env
+
+# anexos enviados no teste local
+java-mysql/uploads/
+
+# documentacao pessoal (fica no documento Word no computador, nao no GitHub)
+firebase/README.md
+firebase/GUIA-FIREBASE.md
+firebase/ROTEIRO-APRESENTACAO.md
+java-mysql/README.md
+atualizar-github.cmd

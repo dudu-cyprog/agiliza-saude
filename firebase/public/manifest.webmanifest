@@ -1,0 +1,21 @@
+{
+  "name": "Agiliza Saúde • Cidade Ocidental",
+  "short_name": "Agiliza Saúde",
+  "description": "Peça consultas, exames, transporte (TFD) e medicamentos e acompanhe pelo CPF.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0a3d62",
+  "icons": [
+    { "src": "img/icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "img/icone-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "img/logo.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "Acompanhar pedido", "url": "/#consultar" },
+    { "name": "Novo pedido", "url": "/#solicitar" },
+    { "name": "Painel CRM", "url": "/painel.html" }
+  ]
+}

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <title>Agiliza Saúde - Cidade Ocidental (GO)</title>
+  <defs>
+    <linearGradient id="fundoB" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#051c2d"/>
+      <stop offset="0.55" stop-color="#0a3d62"/>
+      <stop offset="1" stop-color="#0077c2"/>
+    </linearGradient>
+    <linearGradient id="fundoL" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a3d62"/>
+      <stop offset="1" stop-color="#0077c2"/>
+    </linearGradient>
+    <linearGradient id="pulsoB" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#00a8ff"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#fundoB)"/>
+
+  <!-- linha de batimento atravessando o fundo -->
+  <polyline points="0,520 300,520 340,470 380,575 425,430 465,520 1200,520"
+            fill="none" stroke="#00a8ff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.25"/>
+
+  <!-- círculos decorativos -->
+  <circle cx="1110" cy="80" r="160" fill="#00a8ff" opacity="0.08"/>
+  <circle cx="1030" cy="600" r="120" fill="#10b981" opacity="0.08"/>
+
+  <!-- ícone (mesmo desenho do logo.svg) -->
+  <g transform="translate(80,135) scale(0.70)">
+    <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#fundoL)" stroke="#ffffff" stroke-opacity="0.25" stroke-width="4"/>
+    <g stroke="#ffffff" stroke-linecap="round" fill="none">
+      <line x1="58" y1="214" x2="118" y2="214" stroke-width="18" opacity="0.9"/>
+      <line x1="40" y1="262" x2="104" y2="262" stroke-width="18" opacity="0.6"/>
+      <line x1="62" y1="310" x2="112" y2="310" stroke-width="18" opacity="0.35"/>
+    </g>
+    <path d="M276 420 C 150 338, 110 266, 140 202 C 168 142, 240 136, 276 190 C 312 136, 384 142, 412 202 C 442 266, 402 338, 276 420 Z" fill="#ffffff"/>
+    <polyline points="150,268 222,268 244,226 270,322 300,196 324,268 404,268" fill="none" stroke="url(#pulsoB)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="398" cy="128" r="54" fill="#10b981" stroke="#ffffff" stroke-width="10"/>
+    <polyline points="373,128 391,146 425,110" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- textos -->
+  <g font-family="Segoe UI, system-ui, -apple-system, Roboto, Arial, sans-serif" fill="#ffffff">
+    <text x="490" y="232" font-size="30" font-weight="600" fill="#7dd3fc" letter-spacing="3">PREFEITURA DE CIDADE OCIDENTAL (GO)</text>
+    <text x="486" y="328" font-size="96" font-weight="800">Agiliza <tspan fill="#34d399">Saúde</tspan></text>
+    <text x="490" y="392" font-size="34" font-weight="400" fill="#e2e8f0">Saúde sem filas e sem perda de documentos.</text>
+    <g font-size="24" font-weight="600" fill="#cbd5e1">
+      <text x="490" y="458">Consultas • Exames • Transporte (TFD) • Medicamentos</text>
+    </g>
+  </g>
+</svg>

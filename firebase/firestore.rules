@@ -1,0 +1,421 @@
+rules_version = '2';
+// =====================================================================
+// Agiliza Saude - regras do Firestore (plano gratuito, sem Cloud Functions)
+// O navegador fala direto com o banco; TODA a seguranca esta aqui.
+//
+// pacientes/{uid}      perfil do municipe (so ele e os servidores leem)
+// pacientes/balcao-{cpf}  cadastro feito pelo servidor no atendimento presencial (sem conta)
+// logins/{cpf}         login por CPF: e-mail CRIPTOGRAFADO com a senha da pessoa (CPF unico)
+// servidores/{uid}     pedido de acesso do servidor (ADMIN aprova)
+// solicitacoes/{prot}  pedidos (dono e servidores leem; servidor muda status)
+//   /historico/{id}    auditoria das mudancas
+// anexos/{prot}        foto/PDF da guia (dono e servidores leem)
+// consultas/{cpf}/pedidos/{prot}  resumo publico: quem sabe o CPF ve o andamento (sem dados pessoais)
+// triagem/{prot}       prioridade na fila (Urgente/Prioritario/Normal) - SO servidores
+// =====================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function logado() {
+      return request.auth != null;
+    }
+    function caminho(colecao, id) {
+      return /databases/$(database)/documents/$(colecao)/$(id);
+    }
+    function servidor() {
+      return get(caminho('servidores', request.auth.uid)).data;
+    }
+    function ehServidor() {
+      return logado()
+        && exists(caminho('servidores', request.auth.uid))
+        && servidor().aprovado == true
+        && servidor().perfil in ['ATENDENTE', 'REGULADOR', 'ADMIN'];
+    }
+    function ehRegulador() {
+      return ehServidor() && servidor().perfil in ['REGULADOR', 'ADMIN'];
+    }
+    function ehAdmin() {
+      return ehServidor() && servidor().perfil == 'ADMIN';
+    }
+    function texto(v, min, max) {
+      return v is string && v.size() >= min && v.size() <= max;
+    }
+    function soMudou(campos) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos);
+    }
+    function novo() {
+      return request.resource.data;
+    }
+    // Solicitacao criada NESTA mesma gravacao (batch) pelo proprio usuario.
+    function solicitacaoNovaDoUsuario(prot) {
+      return getAfter(caminho('solicitacoes', prot)).data.uid == request.auth.uid
+        && getAfter(caminho('solicitacoes', prot)).data.criadoEm == request.time;
+    }
+    // Solicitacao criada NESTA gravacao por um servidor (atendimento presencial / balcao).
+    function solicitacaoNovaDaEquipe(prot) {
+      return ehServidor()
+        && getAfter(caminho('solicitacoes', prot)).data.get('criadoPor', null) == request.auth.uid
+        && getAfter(caminho('solicitacoes', prot)).data.criadoEm == request.time;
+    }
+    // Cirurgia eletiva: procedimento, hospital e checklist do pre-operatorio.
+    function cirurgiaValida(c) {
+      return c == null || (c is map
+        && c.keys().hasOnly(['procedimento', 'hospital', 'preOp'])
+        && texto(c.procedimento, 3, 160)
+        && texto(c.hospital, 3, 160)
+        && (c.get('preOp', null) == null || (c.preOp is map
+          && c.preOp.keys().hasOnly(['exames', 'riscoCirurgico', 'termo', 'orientado']))));
+    }
+    function statusValido(s) {
+      return s in ['RECEBIDA', 'EM_TRIAGEM', 'EM_ANALISE_REGULACAO', 'AGENDADA', 'CONCLUIDA', 'NEGADA', 'CANCELADA', 'FALTOU'];
+    }
+    function statusAberto(s) {
+      return s in ['RECEBIDA', 'EM_TRIAGEM', 'EM_ANALISE_REGULACAO'];
+    }
+    // O proprio municipe cancelou o pedido NESTA gravacao (so pedidos ainda em aberto).
+    function canceladoAgoraPeloDono(prot) {
+      return logado()
+        && get(caminho('solicitacoes', prot)).data.uid == request.auth.uid
+        && statusAberto(get(caminho('solicitacoes', prot)).data.status)
+        && getAfter(caminho('solicitacoes', prot)).data.status == 'CANCELADA';
+    }
+    function permitidoParaPerfil(s) {
+      return !(s in ['AGENDADA', 'CONCLUIDA', 'NEGADA']) || ehRegulador();
+    }
+    // Dados da marcacao (data, hora, local...). So REGULADOR/ADMIN altera.
+    function agendamentoValido(a) {
+      return a == null || (a is map
+        && a.keys().hasOnly(['data', 'hora', 'local', 'profissional', 'orientacoes', 'agendaId', 'vaga'])
+        && (a.get('agendaId', null) == null || texto(a.agendaId, 1, 80))
+        && (a.get('vaga', null) == null || (a.vaga is int && a.vaga >= 0 && a.vaga < 200))
+        && a.data is string && a.data.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && a.hora is string && a.hora.matches('^[0-2][0-9]:[0-5][0-9]$')
+        && texto(a.local, 3, 160)
+        && texto(a.get('profissional', ''), 0, 120)
+        && texto(a.get('orientacoes', ''), 0, 500));
+    }
+    function dataOuVazio(d) {
+      return d is string && (d == '' || d.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
+    }
+    function agendamentoPermitido() {
+      return request.resource.data.get('agendamento', null) == resource.data.get('agendamento', null)
+        || (ehRegulador() && agendamentoValido(request.resource.data.get('agendamento', null)));
+    }
+
+    // ------------------------------------------------------------ municipe
+    function pacienteValido(uid) {
+      return logado() && request.auth.uid == uid
+        && novo().keys().hasOnly(['nome', 'cpf', 'sus', 'nascimento', 'telefone', 'email', 'consentimentoLgpd', 'criadoEm', 'atualizadoEm'])
+        && texto(novo().nome, 3, 120)
+        && novo().cpf is string && novo().cpf.matches('^[0-9]{11}$')
+        && novo().sus is string && novo().sus.matches('^[0-9]{15}$')
+        && novo().nascimento is string && novo().nascimento.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && novo().telefone is string && novo().telefone.matches('^[0-9]{10,11}$')
+        && novo().consentimentoLgpd == true;
+    }
+
+    // Cadastro feito pelo SERVIDOR para quem foi presencialmente (sem conta/e-mail).
+    // ID do documento = "balcao-" + CPF. Cartao SUS e telefone podem ficar em branco.
+    function pacienteBalcaoValido(id) {
+      return ehServidor()
+        && novo().keys().hasOnly(['nome', 'cpf', 'sus', 'nascimento', 'telefone', 'semConta', 'consentimentoLgpd',
+                                  'consentimentoPresencial', 'cadastradoPor', 'cadastradoPorNome', 'ubsCadastro',
+                                  'criadoEm', 'atualizadoEm'])
+        && novo().cpf is string && novo().cpf.matches('^[0-9]{11}$')
+        && id == 'balcao-' + novo().cpf
+        && texto(novo().nome, 3, 120)
+        && novo().sus is string && novo().sus.matches('^([0-9]{15})?$')
+        && novo().nascimento is string && novo().nascimento.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && novo().telefone is string && novo().telefone.matches('^([0-9]{10,11})?$')
+        && novo().semConta == true
+        && novo().consentimentoLgpd == true
+        && novo().consentimentoPresencial == true
+        && texto(novo().ubsCadastro, 1, 120)
+        && texto(novo().cadastradoPorNome, 1, 120);
+    }
+
+    match /pacientes/{uid} {
+      allow read: if logado() && (request.auth.uid == uid || ehServidor());
+      // O CPF so e aceito se o registro de login dele for deste usuario (garante CPF unico).
+      allow create: if (pacienteValido(uid)
+          && getAfter(caminho('logins', novo().cpf)).data.uid == request.auth.uid)
+        // balcao: so se a pessoa ainda nao tem conta no site (senao o servidor usa a conta dela)
+        || (pacienteBalcaoValido(uid)
+          && novo().cadastradoPor == request.auth.uid
+          && !exists(caminho('logins', novo().cpf)));
+      // CPF nao muda; conta antiga sem CPF pode incluir uma vez (junto com o registro de login).
+      allow update: if (pacienteValido(uid) && (
+          resource.data.get('cpf', null) == null
+            ? getAfter(caminho('logins', novo().cpf)).data.uid == request.auth.uid
+            : novo().cpf == resource.data.cpf))
+        // balcao: servidor corrige nome, Cartao SUS e telefone
+        || (pacienteBalcaoValido(uid)
+          && soMudou(['nome', 'sus', 'telefone', 'atualizadoEm']));
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------ login por CPF
+    // Qualquer um le pelo CPF, mas so ve o e-mail cifrado (AES-GCM com chave da senha).
+    match /logins/{cpf} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if logado()
+        && cpf.matches('^[0-9]{11}$')
+        && novo().keys().hasOnly(['uid', 'cifra', 'iv', 'sal'])
+        && novo().uid == request.auth.uid
+        && texto(novo().cifra, 1, 600) && texto(novo().iv, 1, 100) && texto(novo().sal, 1, 100)
+        && getAfter(caminho('pacientes', request.auth.uid)).data.cpf == cpf;
+      allow update: if logado() && resource.data.uid == request.auth.uid
+        && soMudou(['cifra', 'iv', 'sal'])
+        && texto(novo().cifra, 1, 600) && texto(novo().iv, 1, 100) && texto(novo().sal, 1, 100);
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------ servidores
+    match /servidores/{uid} {
+      allow read: if logado() && (request.auth.uid == uid || ehAdmin());
+      // Qualquer pessoa pode PEDIR acesso, mas entra sempre como nao aprovada.
+      allow create: if logado() && request.auth.uid == uid
+        && novo().keys().hasOnly(['nome', 'email', 'matricula', 'perfil', 'aprovado', 'criadoEm'])
+        && novo().aprovado == false
+        && novo().perfil == 'ATENDENTE'
+        && texto(novo().nome, 3, 120)
+        && texto(novo().matricula, 1, 30)
+        && novo().email == request.auth.token.email;
+      allow update: if ehAdmin()
+        && soMudou(['perfil', 'aprovado', 'aprovadoPor', 'atualizadoEm'])
+        && novo().perfil in ['ATENDENTE', 'REGULADOR', 'ADMIN']
+        && novo().aprovado is bool;
+      allow delete: if ehAdmin();
+    }
+
+    // ------------------------------------------------------------ solicitacoes
+    // Pedido feito na UBS para quem depois criou conta com o MESMO CPF e nascimento.
+    function pedidoDeBalcaoDoUsuario() {
+      return resource.data.uid == 'balcao-' + get(caminho('pacientes', request.auth.uid)).data.cpf
+        && resource.data.nascimento == get(caminho('pacientes', request.auth.uid)).data.nascimento;
+    }
+    // Campos comuns de um pedido novo; pid = documento do paciente (conta ou balcao).
+    function pedidoNovoValido(prot, pid) {
+      return prot.matches('^[0-9]{4}-[A-Z0-9]{6}$')
+        && novo().keys().hasOnly(['protocolo', 'uid', 'paciente', 'cpf', 'sus', 'nascimento', 'telefone',
+                                  'ubsId', 'ubs', 'servicoId', 'servico', 'status', 'mensagemPublica',
+                                  'temAnexo', 'qtdExtras', 'consentimentoLgpd', 'criadoEm', 'atualizadoEm',
+                                  'canal', 'criadoPor', 'criadoPorNome', 'cirurgia'])
+        && novo().get('qtdExtras', 0) is int && novo().get('qtdExtras', 0) >= 0 && novo().get('qtdExtras', 0) <= 3
+        && novo().protocolo == prot
+        && novo().uid == pid
+        && novo().paciente == getAfter(caminho('pacientes', pid)).data.nome
+        && novo().cpf == getAfter(caminho('pacientes', pid)).data.cpf
+        && novo().sus == getAfter(caminho('pacientes', pid)).data.sus
+        && novo().nascimento == getAfter(caminho('pacientes', pid)).data.nascimento
+        && novo().telefone == getAfter(caminho('pacientes', pid)).data.telefone
+        && texto(novo().ubsId, 1, 40) && texto(novo().ubs, 1, 120)
+        && texto(novo().servicoId, 1, 40) && texto(novo().servico, 1, 120)
+        && novo().status == 'RECEBIDA'
+        && texto(novo().mensagemPublica, 0, 500)
+        && novo().temAnexo is bool
+        && novo().consentimentoLgpd == true
+        && novo().criadoEm == request.time
+        && novo().atualizadoEm == request.time;
+    }
+
+    match /solicitacoes/{prot} {
+      allow read: if logado() && (resource.data.uid == request.auth.uid || ehServidor() || pedidoDeBalcaoDoUsuario());
+
+      allow create: if logado() && (
+        // 1) o proprio municipe, pelo site (cirurgia eletiva nao: so a equipe abre)
+        (novo().uid == request.auth.uid
+          && exists(caminho('pacientes', request.auth.uid))
+          && novo().get('canal', 'SITE') == 'SITE'
+          && !('criadoPor' in novo())
+          && novo().servicoId != 'cirurgia-eletiva'
+          && novo().get('cirurgia', null) == null
+          && pedidoNovoValido(prot, request.auth.uid))
+        // 2) o servidor, no atendimento presencial (balcao), em nome do paciente
+        || (ehServidor()
+          && novo().canal == 'BALCAO'
+          && novo().criadoPor == request.auth.uid
+          && texto(novo().criadoPorNome, 1, 120)
+          && existsAfter(caminho('pacientes', novo().uid))
+          && cirurgiaValida(novo().get('cirurgia', null))
+          && (novo().servicoId == 'cirurgia-eletiva') == (novo().get('cirurgia', null) != null)
+          && pedidoNovoValido(prot, novo().uid))
+      );
+
+      allow update: if (ehServidor()
+        && soMudou(['status', 'mensagemPublica', 'agendamento', 'cirurgia', 'atualizadoEm', 'atualizadoPor'])
+        && statusValido(novo().status)
+        && permitidoParaPerfil(novo().status)
+        && agendamentoPermitido()
+        && cirurgiaValida(novo().get('cirurgia', null))
+        && (novo().get('cirurgia', null) == null) == (resource.data.get('cirurgia', null) == null)
+        && texto(novo().mensagemPublica, 0, 500)
+        && novo().atualizadoEm == request.time)
+        // o proprio municipe pode CANCELAR enquanto o pedido esta em aberto
+        || (logado() && resource.data.uid == request.auth.uid
+          && statusAberto(resource.data.status)
+          && soMudou(['status', 'mensagemPublica', 'atualizadoEm'])
+          && novo().status == 'CANCELADA'
+          && texto(novo().mensagemPublica, 0, 500)
+          && novo().atualizadoEm == request.time);
+
+      allow delete: if false;
+
+      match /historico/{id} {
+        allow read: if ehServidor();
+        allow create: if logado()
+          && novo().keys().hasOnly(['usuario', 'usuarioNome', 'statusAnterior', 'statusNovo', 'observacao', 'criadoEm'])
+          && novo().usuario == request.auth.uid
+          && statusValido(novo().statusNovo)
+          && (novo().observacao == null || texto(novo().observacao, 0, 500))
+          && novo().criadoEm == request.time
+          && (
+            (ehServidor() && permitidoParaPerfil(novo().statusNovo))
+            || (novo().statusNovo == 'RECEBIDA' && solicitacaoNovaDoUsuario(prot))
+            || (novo().statusNovo == 'CANCELADA' && canceladoAgoraPeloDono(prot))
+          );
+        allow update, delete: if false;
+      }
+    }
+
+    // ------------------------------------------------------------ anexos
+    match /anexos/{prot} {
+      allow get: if logado() && (resource.data.uid == request.auth.uid || ehServidor());
+      allow list: if false;
+      allow create: if logado()
+        && novo().keys().hasOnly(['uid', 'dados', 'tipo', 'nome', 'criadoEm'])
+        && novo().tipo in ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+        && novo().dados is string && novo().dados.size() < 1000000
+        && texto(novo().nome, 1, 120)
+        && ((novo().uid == request.auth.uid && solicitacaoNovaDoUsuario(prot))
+          || (solicitacaoNovaDaEquipe(prot) && novo().uid == getAfter(caminho('solicitacoes', prot)).data.uid));
+      allow update, delete: if false;
+
+      // Documentos extras (exames anteriores, laudos): no maximo 3, enviados junto com o pedido.
+      match /extras/{n} {
+        allow get, list: if logado() && (resource.data.uid == request.auth.uid || ehServidor());
+        allow create: if logado()
+          && n in ['1', '2', '3']
+          && novo().keys().hasOnly(['uid', 'dados', 'tipo', 'nome', 'criadoEm'])
+          && novo().tipo in ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+          && novo().dados is string && novo().dados.size() < 1000000
+          && texto(novo().nome, 1, 120)
+          && ((novo().uid == request.auth.uid && solicitacaoNovaDoUsuario(prot))
+            || (solicitacaoNovaDaEquipe(prot) && novo().uid == getAfter(caminho('solicitacoes', prot)).data.uid));
+        allow update, delete: if false;
+      }
+    }
+
+    // ------------------------------------------------------------ consulta publica
+    // Caminho consultas/{CPF}/pedidos/{protocolo}: so chega aos pedidos quem digita o CPF.
+    // Listar "consultas" (todos os CPFs) ou buscar todos os "pedidos" de uma vez e proibido.
+    match /consultas/{cpf}/pedidos/{prot} {
+      allow get, list: if true;
+      allow create: if logado()
+        && novo().keys().hasOnly(['protocolo', 'status', 'primeiroNome', 'servico', 'ubs', 'mensagem', 'atualizadoEm'])
+        && novo().protocolo == prot
+        && (solicitacaoNovaDoUsuario(prot) || solicitacaoNovaDaEquipe(prot))
+        && cpf == getAfter(caminho('solicitacoes', prot)).data.cpf
+        && novo().status == 'RECEBIDA';
+      allow update: if (ehServidor()
+        && soMudou(['status', 'mensagem', 'agendamento', 'atualizadoEm'])
+        && statusValido(novo().status)
+        && permitidoParaPerfil(novo().status)
+        && agendamentoPermitido()
+        && texto(novo().mensagem, 0, 500))
+        || (soMudou(['status', 'mensagem', 'atualizadoEm'])
+          && novo().status == 'CANCELADA'
+          && texto(novo().mensagem, 0, 500)
+          && canceladoAgoraPeloDono(prot));
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------ prioridade (interna)
+    // Classificacao da fila feita pela equipe. SO servidores aprovados leem/gravam:
+    // o municipe nao ve, nem consultando o banco direto pelo navegador.
+    match /triagem/{prot} {
+      allow read: if ehServidor();
+      allow create, update: if ehServidor()
+        && existsAfter(caminho('solicitacoes', prot))
+        && novo().keys().hasOnly(['prioridade', 'motivo', 'definidoPor', 'definidoPorNome', 'definidoEm'])
+        && novo().prioridade in ['URGENTE', 'PRIORITARIO', 'NORMAL']
+        && texto(novo().motivo, 0, 200)
+        && novo().definidoPor == request.auth.uid
+        && texto(novo().definidoPorNome, 0, 120)
+        && novo().definidoEm == request.time;
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------ profissionais
+    // Medicos/enfermeiros/etc. com a agenda semanal padrao. Regulador/Admin cadastram; equipe le.
+    match /profissionais/{id} {
+      allow read: if ehServidor();
+      allow create, update: if ehRegulador()
+        && novo().keys().hasOnly(['nome', 'especialidade', 'registro', 'servicoId', 'local', 'diasSemana',
+                                  'horaInicio', 'horaFim', 'duracaoMin', 'ativo', 'atualizadoPor', 'atualizadoEm',
+                                  'feriasInicio', 'feriasFim', 'feriasMotivo', 'inativoDesde'])
+        && texto(novo().nome, 3, 120)
+        && texto(novo().especialidade, 2, 80)
+        && texto(novo().registro, 0, 40)
+        && texto(novo().servicoId, 1, 40)
+        && texto(novo().local, 3, 160)
+        && novo().diasSemana is list && novo().diasSemana.size() <= 7
+        && novo().horaInicio is string && novo().horaInicio.matches('^[0-2][0-9]:[0-5][0-9]$')
+        && novo().horaFim is string && novo().horaFim.matches('^[0-2][0-9]:[0-5][0-9]$')
+        && novo().duracaoMin is int && novo().duracaoMin >= 5 && novo().duracaoMin <= 240
+        && novo().ativo is bool
+        // ferias/afastamento (periodo opcional): datas AAAA-MM-DD ou vazio
+        && dataOuVazio(novo().get('feriasInicio', '')) && dataOuVazio(novo().get('feriasFim', ''))
+        && texto(novo().get('feriasMotivo', ''), 0, 80)
+        && dataOuVazio(novo().get('inativoDesde', ''))
+        && novo().atualizadoPor == request.auth.uid;
+      // nunca se apaga: quem saiu fica "desativado" (ativo = false) e os dados continuam guardados
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------ agendas (oferta de vagas)
+    // Um dia de atendimento: servico, local, data, horario e quantidade de vagas (opcional: profissional).
+    match /agendas/{aid} {
+      allow read: if ehServidor();
+      allow create, update: if ehRegulador()
+        && novo().keys().hasOnly(['servicoId', 'servico', 'local', 'data', 'horaInicio', 'intervaloMin', 'vagas',
+                                  'profissionalId', 'profissionalNome', 'especialidade', 'orientacoes',
+                                  'criadoPor', 'criadoPorNome', 'criadoEm'])
+        && texto(novo().servicoId, 1, 40) && texto(novo().servico, 1, 120)
+        && texto(novo().local, 3, 160)
+        && novo().data is string && novo().data.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && novo().horaInicio is string && novo().horaInicio.matches('^[0-2][0-9]:[0-5][0-9]$')
+        && novo().intervaloMin is int && novo().intervaloMin >= 0 && novo().intervaloMin <= 240
+        && novo().vagas is int && novo().vagas >= 1 && novo().vagas <= 200
+        && texto(novo().get('profissionalNome', ''), 0, 120)
+        && texto(novo().get('orientacoes', ''), 0, 500)
+        && novo().criadoPor == (request.method == 'create' ? request.auth.uid : resource.data.criadoPor);
+      allow delete: if ehRegulador();
+
+      // Cada vaga ocupada e um documento cujo ID e o numero da vaga: dois pacientes NUNCA
+      // ficam no mesmo horario (criar uma vaga que ja existe e recusado).
+      match /vagas/{n} {
+        allow read: if ehServidor();
+        allow create: if ehRegulador()
+          && n.matches('^[0-9]{1,3}$')
+          && int(n) < get(caminho('agendas', aid)).data.vagas
+          && novo().keys().hasOnly(['protocolo', 'paciente', 'hora', 'marcadoPor', 'marcadoEm'])
+          && novo().marcadoPor == request.auth.uid
+          && novo().marcadoEm == request.time
+          // o pedido e marcado NESTA mesma gravacao, apontando para esta agenda e esta vaga
+          && getAfter(caminho('solicitacoes', novo().protocolo)).data.agendamento.agendaId == aid
+          && getAfter(caminho('solicitacoes', novo().protocolo)).data.agendamento.vaga == int(n)
+          && getAfter(caminho('solicitacoes', novo().protocolo)).data.status == 'AGENDADA';
+        // liberar a vaga (desmarcar / remarcar)
+        allow delete: if ehRegulador();
+        allow update: if false;
+      }
+    }
+
+    // Todo o resto: bloqueado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

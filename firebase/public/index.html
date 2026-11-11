@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agiliza Saúde • Cidade Ocidental (GO)</title>
+    <meta name="description" content="Peça consultas, exames, transporte (TFD) e medicamentos da rede municipal de saúde de Cidade Ocidental e acompanhe pelo CPF.">
+    <!-- Ícone da aba, ícone de aplicativo (PWA) e imagem ao compartilhar o link -->
+    <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+    <link rel="icon" href="img/icone-192.png" sizes="192x192" type="image/png">
+    <link rel="apple-touch-icon" href="img/icone-180.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#0a3d62">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Agiliza Saúde • Cidade Ocidental (GO)">
+    <meta property="og:description" content="Saúde sem filas e sem perda de documentos. Peça atendimento e acompanhe pelo celular.">
+    <meta property="og:image" content="https://agiliza-saude-5ab0e.web.app/img/banner.png">
+    <meta property="og:url" content="https://agiliza-saude-5ab0e.web.app/">
+    <meta name="twitter:card" content="summary_large_image">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --azul-gov: #0a3d62;
+            --azul-claro: #00a8ff;
+            --verde-acao: #10b981;
+            --cinza-bg: #f8fafc;
+            --cor-texto: #334155;
+            --tamanho-base: 16px;
+        }
+
+        html {
+            font-size: var(--tamanho-base);
+        }
+
+        body {
+            background-color: var(--cinza-bg);
+            color: var(--cor-texto);
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        /* BARRA SUPERIOR DE ACESSIBILIDADE E IDIOMAS */
+        .barra-acessibilidade {
+            background-color: #051c2d;
+            color: #e2e8f0;
+            font-size: 0.8rem;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .btn-acessibilidade {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #fff;
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-acessibilidade:hover {
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+
+        /* Estilização do widget do Google Translate */
+        #google_translate_element {
+            display: inline-block;
+        }
+        .goog-te-gadget-simple {
+            background-color: transparent !important;
+            border: 1px solid rgba(255,255,255,0.3) !important;
+            padding: 2px 6px !important;
+            border-radius: 4px !important;
+            font-size: 0.75rem !important;
+        }
+        .goog-te-gadget-simple span, .goog-te-gadget-simple a {
+            color: #fff !important;
+        }
+
+        /* MODO DE ALTO CONTRASTE (WCAG) */
+        body.alto-contraste {
+            background-color: #000000 !important;
+            color: #ffff00 !important;
+        }
+        body.alto-contraste .navbar,
+        body.alto-contraste .hero-banner,
+        body.alto-contraste .card,
+        body.alto-contraste footer,
+        body.alto-contraste .modal-content {
+            background-color: #000000 !important;
+            color: #ffff00 !important;
+            border: 2px solid #ffff00 !important;
+        }
+        body.alto-contraste .btn-primary,
+        body.alto-contraste .btn-success,
+        body.alto-contraste .btn-outline-light {
+            background-color: #ffff00 !important;
+            color: #000000 !important;
+            border-color: #ffff00 !important;
+            font-weight: bold !important;
+        }
+        body.alto-contraste input,
+        body.alto-contraste select,
+        body.alto-contraste textarea {
+            background-color: #111111 !important;
+            color: #ffff00 !important;
+            border: 1px solid #ffff00 !important;
+        }
+
+        /* ESTILOS VISUAIS */
+        .navbar-custom {
+            background-color: var(--azul-gov);
+            border-bottom: 3px solid var(--azul-claro);
+        }
+
+        .hero-banner {
+            background: linear-gradient(135deg, rgba(10,61,98,0.95), rgba(0,168,255,0.85)),
+                        url('https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1400&q=80') center/cover;
+            color: white;
+            padding: 50px 0;
+        }
+
+        .card-servico {
+            border: none;
+            border-radius: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        .card-servico:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        }
+
+        .icone-servico {
+            font-size: 2.2rem;
+            color: var(--azul-gov);
+        }
+
+        .nav-tabs .nav-link { color: var(--azul-gov); }
+        .nav-tabs .nav-link.active { font-weight: 600; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. BARRA SUPERIOR: ACESSIBILIDADE + SELETOR DE IDIOMAS -->
+    <div class="barra-acessibilidade" role="region" aria-label="Barra de Acessibilidade e Idiomas">
+        <div class="container d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>🏛️ PREFEITURA DE CIDADE OCIDENTAL • LEI Nº 14.129/21</span>
+
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <!-- Seletor de Idiomas -->
+                <div class="d-flex align-items-center gap-1 me-2 border-end pe-2">
+                    <i class="bi bi-translate text-info me-1" aria-hidden="true"></i>
+                    <span class="d-none d-sm-inline">Idioma:</span>
+                    <div id="google_translate_element"></div>
+                </div>
+
+                <!-- Ferramentas de Acessibilidade -->
+                <span>Acessibilidade:</span>
+                <button class="btn-acessibilidade" onclick="alterarFonte(1)" aria-label="Aumentar texto">A+</button>
+                <button class="btn-acessibilidade" onclick="alterarFonte(-1)" aria-label="Diminuir texto">A-</button>
+                <button class="btn-acessibilidade" onclick="alternarContraste()" aria-label="Alternar alto contraste">
+                    <i class="bi bi-circle-half" aria-hidden="true"></i> Contraste
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. NAVBAR INSTITUCIONAL -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom sticky-top" role="navigation" aria-label="Menu Principal">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="#">
+                <img src="img/logo.svg" alt="" width="44" height="44">
+                <div>
+                    <span class="fs-4">Agiliza Saúde</span>
+                    <small class="d-block text-white-50" style="font-size: 0.7rem;">CIDADE OCIDENTAL (GO)</small>
+                </div>
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menuPrincipal" aria-controls="menuPrincipal" aria-expanded="false" aria-label="Abrir Menu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="menuPrincipal">
+                <ul class="navbar-nav ms-auto align-items-lg-center gap-2">
+                    <li class="nav-item"><a class="nav-link text-white" href="#servicos">Serviços</a></li>
+                    <li class="nav-item"><a class="nav-link text-white" href="#consultar">Consultar Pedido</a></li>
+                    <li class="nav-item"><a class="nav-link text-white" href="#informacoes">Informações</a></li>
+                    <li class="nav-item"><a class="nav-link text-white" href="#postos">Unidades UBS</a></li>
+                    <!-- Visitante -->
+                    <li class="nav-item" id="navEntrar">
+                        <button class="btn btn-light btn-sm ms-lg-2 px-3 py-2 fw-semibold text-primary" onclick="abrirMunicipe('entrar')">
+                            <i class="bi bi-person-circle me-1" aria-hidden="true"></i> Entrar / Cadastrar
+                        </button>
+                    </li>
+                    <!-- Municipe logado -->
+                    <li class="nav-item d-none" id="navMinhaArea">
+                        <a class="btn btn-light btn-sm ms-lg-2 px-3 py-2 fw-semibold text-primary" href="#minhaArea">
+                            <i class="bi bi-person-check me-1" aria-hidden="true"></i> Minha Área
+                        </a>
+                    </li>
+                    <!-- Servidor logado e aprovado -->
+                    <li class="nav-item d-none" id="navPainel">
+                        <a class="btn btn-warning btn-sm ms-lg-2 px-3 py-2 fw-semibold" href="painel.html">
+                            <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i> Ir para o Painel
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <button class="btn btn-outline-light btn-sm ms-lg-2 px-3 py-2 fw-semibold" onclick="abrirServidor('entrar')">
+                            <i class="bi bi-shield-lock me-1" aria-hidden="true"></i> Área do Servidor
+                        </button>
+                    </li>
+                    <li class="nav-item d-none" id="navSair">
+                        <button class="btn btn-link btn-sm text-white-50" onclick="sair()">Sair</button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 3. HERO BANNER COM CONSULTA DIRETA -->
+    <header class="hero-banner">
+        <div class="container">
+            <div class="row align-items-center g-4">
+                <div class="col-12 col-lg-7">
+                    <span class="badge bg-light text-primary px-3 py-2 mb-3 fw-bold rounded-pill">
+                        Atendimento Público Digital e Humanizado
+                    </span>
+                    <h1 class="display-5 fw-bold mb-3">Saúde sem filas e sem perda de documentos.</h1>
+                    <p class="lead mb-4 text-white-50">
+                        Marque consultas com especialistas, solicite viagens de saúde (TFD) e veja o andamento da sua solicitação em tempo real pelo celular.
+                    </p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="#solicitar" class="btn btn-primary btn-lg px-4 fw-bold">Solicitar Atendimento</a>
+                        <button class="btn btn-outline-light btn-lg px-4" id="btnHeroCadastro" onclick="abrirMunicipe('cadastrar')">Criar minha conta</button>
+                    </div>
+                </div>
+
+                <!-- Card de Consulta por CPF -->
+                <div class="col-12 col-lg-5" id="consultar">
+                    <div class="card shadow-lg p-4 bg-white text-dark rounded-4 border-0">
+                        <h4 class="fw-bold mb-2 text-primary">
+                            <i class="bi bi-search me-2" aria-hidden="true"></i>Acompanhar Solicitação
+                        </h4>
+                        <p class="small text-muted mb-3">Digite o CPF do paciente:</p>
+
+                        <form onsubmit="event.preventDefault(); verificarConsulta();">
+                            <div class="mb-3">
+                                <label for="consCpf" class="form-label small fw-bold">CPF:</label>
+                                <input type="text" id="consCpf" class="form-control form-control-lg" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" autocomplete="off" required>
+                            </div>
+                            <button type="submit" id="btnConsultar" class="btn btn-success btn-lg w-100 fw-bold">
+                                Localizar Atendimento
+                            </button>
+                            <p class="small text-muted mt-2 mb-0">Tem conta? Veja todos os seus pedidos em <a href="#minhaArea" onclick="return irParaMinhaArea()">Minha Área</a>.</p>
+                        </form>
+
+                        <!-- Resultado da consulta -->
+                        <div id="resultadoAtendimento" class="mt-3 d-none" aria-live="polite"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 4. MINHA ÁREA (munícipe logado) -->
+    <section class="py-5 d-none" id="minhaArea">
+        <div class="container" style="max-width: 960px;">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <div>
+                    <span class="badge bg-success px-3 py-2 mb-2">Minha Área</span>
+                    <h3 class="fw-bold mb-0">Olá, <span id="saudacaoNome"></span>!</h3>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="#solicitar" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Novo pedido</a>
+                    <button class="btn btn-outline-secondary" onclick="sair()"><i class="bi bi-box-arrow-right me-1"></i>Sair</button>
+                </div>
+            </div>
+
+            <!-- Novidades desde a última visita -->
+            <div id="avisoNovidades" class="alert alert-warning d-none" role="status"></div>
+
+            <!-- Conta criada antes do CPF: pede para completar -->
+            <div id="avisoSemCpf" class="alert alert-warning d-none">
+                <strong><i class="bi bi-exclamation-triangle me-1"></i>Complete seu cadastro com o CPF</strong>
+                <div class="small mb-2">Com o CPF você entra no site e consulta seus pedidos sem precisar do e-mail. É necessário para fazer novos pedidos.</div>
+                <form class="row g-2 align-items-end" onsubmit="event.preventDefault(); incluirCpf();">
+                    <div class="col-12 col-md-4">
+                        <label for="addCpf" class="form-label small fw-bold">CPF</label>
+                        <input type="text" id="addCpf" class="form-control" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" required>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="addSenha" class="form-label small fw-bold">Sua senha atual</label>
+                        <input type="password" id="addSenha" class="form-control" autocomplete="current-password" required>
+                    </div>
+                    <div class="col-12 col-md-4"><button class="btn btn-warning w-100 fw-bold" type="submit">Salvar CPF</button></div>
+                </form>
+                <div id="msgAddCpf" class="alert py-2 small d-none mt-2" role="alert"></div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <h6 class="fw-bold text-primary"><i class="bi bi-person-vcard me-1"></i>Meus dados</h6>
+                            <div class="small" id="meusDados"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-8">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <h6 class="fw-bold text-primary"><i class="bi bi-list-check me-1"></i>Minhas solicitações</h6>
+                            <div id="minhasSolicitacoes" class="small text-muted">Carregando...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 5. GRADE DE SERVIÇOS -->
+    <section class="py-5" id="servicos">
+        <div class="container">
+            <div class="text-center mb-5">
+                <h2 class="fw-bold">Serviços em Destaque</h2>
+                <p class="text-muted">Selecione o serviço que você deseja solicitar à equipe de saúde:</p>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-6 col-md-3">
+                    <div class="card card-servico shadow-sm p-4 text-center h-100" onclick="selecionarServico('consulta-especializada')">
+                        <i class="bi bi-person-heart icone-servico mb-3" aria-hidden="true"></i>
+                        <h6 class="fw-bold mb-1">Especialidades</h6>
+                        <small class="text-muted">Cardiologia, ortopedia e oftalmologia.</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card card-servico shadow-sm p-4 text-center h-100" onclick="selecionarServico('exames')">
+                        <i class="bi bi-file-earmark-medical icone-servico mb-3" aria-hidden="true"></i>
+                        <h6 class="fw-bold mb-1">Exames e Guias</h6>
+                        <small class="text-muted">Ultrassonografia, raio-X e sangue.</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card card-servico shadow-sm p-4 text-center h-100" onclick="selecionarServico('tfd')">
+                        <i class="bi bi-bus-front icone-servico mb-3" aria-hidden="true"></i>
+                        <h6 class="fw-bold mb-1">Transporte (TFD)</h6>
+                        <small class="text-muted">Viagens para tratamento em Goiânia/DF.</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card card-servico shadow-sm p-4 text-center h-100" onclick="selecionarServico('medicamentos')">
+                        <i class="bi bi-capsule icone-servico mb-3" aria-hidden="true"></i>
+                        <h6 class="fw-bold mb-1">Medicamentos</h6>
+                        <small class="text-muted">Remédios de uso contínuo na farmácia.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6. NOVA SOLICITAÇÃO -->
+    <section class="py-5 bg-white border-top border-bottom" id="solicitar">
+        <div class="container" style="max-width: 800px;">
+            <div class="text-center mb-4">
+                <span class="badge bg-primary px-3 py-2 mb-2">Entrada de Atendimento</span>
+                <h3 class="fw-bold">Nova Solicitação de Atendimento</h3>
+                <p class="text-muted">Escolha a unidade e o serviço e anexe a foto da sua guia ou encaminhamento médico:</p>
+            </div>
+
+            <!-- Visitante: precisa entrar -->
+            <div id="solicitarVisitante" class="card shadow-sm border-0 p-4 rounded-4 bg-light text-center">
+                <i class="bi bi-person-lock fs-1 text-primary" aria-hidden="true"></i>
+                <h5 class="fw-bold mt-2">Entre ou crie sua conta para fazer um pedido</h5>
+                <p class="text-muted small mb-3">Com a conta, seus dados ficam guardados e você acompanha todos os seus pedidos na Minha Área.</p>
+                <div class="d-flex justify-content-center flex-wrap gap-2">
+                    <button class="btn btn-primary btn-lg px-4" onclick="abrirMunicipe('cadastrar')">Criar conta</button>
+                    <button class="btn btn-outline-primary btn-lg px-4" onclick="abrirMunicipe('entrar')">Já tenho conta</button>
+                </div>
+            </div>
+
+            <!-- Munícipe logado -->
+            <div id="solicitarLogado" class="card shadow-sm border-0 p-4 rounded-4 bg-light d-none">
+                <div class="alert alert-light border small mb-3" id="resumoPaciente"></div>
+                <form id="formDemanda" onsubmit="event.preventDefault(); cadastrarDemanda();">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label for="ubsSelect" class="form-label fw-semibold">UBS de Referência (Bairro)</label>
+                            <select id="ubsSelect" class="form-select form-select-lg" required></select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label for="tipoSelect" class="form-label fw-semibold">Serviço Necessário</label>
+                            <select id="tipoSelect" class="form-select form-select-lg" required></select>
+                        </div>
+                        <div class="col-12">
+                            <label for="guiaUpload" class="form-label fw-semibold">Foto do Pedido / Encaminhamento <span class="text-muted fw-normal">(opcional)</span></label>
+                            <input type="file" id="guiaUpload" class="form-control form-control-lg" accept="image/jpeg,image/png,image/webp,application/pdf">
+                            <div class="form-text">Se tiver, envie a foto (JPG, PNG, WEBP) ou PDF de até 650 KB: ajuda a equipe a analisar mais rápido. Fotos são reduzidas automaticamente.</div>
+                        </div>
+                        <div class="col-12">
+                            <label for="extrasUpload" class="form-label fw-semibold">Outros documentos <span class="text-muted fw-normal">(opcional, até 3)</span></label>
+                            <input type="file" id="extrasUpload" class="form-control" accept="image/jpeg,image/png,image/webp,application/pdf" multiple>
+                            <div class="form-text">Exames anteriores, laudos ou receitas que ajudem a equipe a analisar o pedido.</div>
+                        </div>
+                        <div class="col-12 mt-3">
+                            <div class="form-check p-3 bg-white rounded border">
+                                <input class="form-check-input ms-0 me-2" type="checkbox" id="checkLgpd" required>
+                                <label class="form-check-label small text-muted" for="checkLgpd">
+                                    <strong>Termo de Consentimento LGPD (Lei nº 13.709/2018):</strong> Autorizo a utilização dos meus dados de identificação e saúde exclusivamente para fins de agendamento e triagem na rede pública municipal de Cidade Ocidental.
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12 mt-4 text-center">
+                            <div id="msgDemanda" class="alert d-none text-start" role="alert"></div>
+                            <button type="submit" id="btnEnviar" class="btn btn-primary btn-lg px-5 fw-bold shadow-sm">
+                                <i class="bi bi-send-check me-2" aria-hidden="true"></i>Enviar Pedido
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- 7. INFORMAÇÕES IMPORTANTES -->
+    <section class="py-5" id="informacoes">
+        <div class="container">
+            <div class="text-center mb-4">
+                <h3 class="fw-bold">Informações Importantes</h3>
+                <p class="text-muted">Leia antes de fazer o seu pedido</p>
+            </div>
+
+            <div class="alert alert-danger d-flex align-items-start gap-2 mb-4" role="alert">
+                <i class="bi bi-exclamation-octagon-fill fs-4" aria-hidden="true"></i>
+                <div>
+                    <strong>Este site NÃO é para urgências e emergências.</strong>
+                    Em caso de risco à vida ligue <strong>SAMU 192</strong> ou <strong>Bombeiros 193</strong>,
+                    ou procure a unidade de pronto atendimento mais próxima.
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12 col-md-6 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100 p-3">
+                        <h6 class="fw-bold text-primary"><i class="bi bi-signpost-split me-1" aria-hidden="true"></i>Como funciona</h6>
+                        <ol class="small mb-0 ps-3">
+                            <li>Crie sua conta com seus dados e Cartão SUS.</li>
+                            <li>Escolha a UBS e o serviço e envie a foto da guia/encaminhamento.</li>
+                            <li>Guarde o <strong>número do protocolo</strong>.</li>
+                            <li>A equipe faz a triagem e a regulação analisa o pedido.</li>
+                            <li>Quando for <strong>marcado</strong>, a data, o horário e o local aparecem na sua Minha Área e na consulta por CPF.</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100 p-3">
+                        <h6 class="fw-bold text-primary"><i class="bi bi-folder-check me-1" aria-hidden="true"></i>Documentos necessários</h6>
+                        <ul class="small mb-0 ps-3">
+                            <li>Cartão Nacional de Saúde (Cartão SUS).</li>
+                            <li>Documento oficial com foto (RG ou CNH).</li>
+                            <li>Comprovante de residência em Cidade Ocidental.</li>
+                            <li>Guia, pedido ou encaminhamento médico <strong>legível</strong>, com carimbo e assinatura.</li>
+                            <li>Exames anteriores, se houver.</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100 p-3">
+                        <h6 class="fw-bold text-primary"><i class="bi bi-calendar2-week me-1" aria-hidden="true"></i>No dia do atendimento</h6>
+                        <ul class="small mb-0 ps-3">
+                            <li>Chegue com <strong>30 minutos de antecedência</strong>.</li>
+                            <li>Leve todos os documentos e a guia original.</li>
+                            <li>Siga as orientações informadas na marcação (ex.: jejum).</li>
+                            <li>Não puder ir? Avise sua UBS o quanto antes para liberar a vaga a outro paciente.</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100 p-3">
+                        <h6 class="fw-bold text-primary"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Bom saber</h6>
+                        <ul class="small mb-0 ps-3">
+                            <li>A ordem de atendimento segue a <strong>classificação de risco</strong> da regulação, não a data do pedido.</li>
+                            <li>Mantenha seu telefone atualizado: a UBS pode ligar para confirmar.</li>
+                            <li>Pedido "Não autorizado"? Procure sua UBS de referência.</li>
+                            <li>Dúvidas sobre o SUS: <strong>Disque Saúde 136</strong>.</li>
+                            <li>Seus dados são protegidos pela LGPD (Lei nº 13.709/2018).</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 8. POSTOS DE ATENDIMENTO (UBS) -->
+    <section class="py-5" id="postos">
+        <div class="container">
+            <div class="text-center mb-4">
+                <h3 class="fw-bold">Unidades Básicas de Saúde (UBS)</h3>
+                <p class="text-muted">Rede presencial de apoio em Cidade Ocidental (GO)</p>
+            </div>
+            <div class="row g-3" id="listaUbs"></div>
+        </div>
+    </section>
+
+    <!-- 9. MODAL DO MUNÍCIPE: ENTRAR / CRIAR CONTA -->
+    <div class="modal fade" id="modalMunicipe" tabindex="-1" aria-labelledby="modalMunicipeLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="modalMunicipeLabel">
+                        <i class="bi bi-person-circle me-2" aria-hidden="true"></i>Área do Cidadão
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <ul class="nav nav-tabs mb-3" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="abaMunEntrar" data-bs-toggle="tab" data-bs-target="#painelMunEntrar" type="button" role="tab">Entrar</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="abaMunCadastrar" data-bs-toggle="tab" data-bs-target="#painelMunCadastrar" type="button" role="tab">Criar conta</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content">
+                        <!-- Entrar -->
+                        <div class="tab-pane fade show active" id="painelMunEntrar" role="tabpanel">
+                            <form onsubmit="event.preventDefault(); entrarMunicipe();">
+                                <div class="mb-3">
+                                    <label for="munEmail" class="form-label small fw-bold">CPF ou e-mail:</label>
+                                    <input type="text" id="munEmail" class="form-control" placeholder="000.000.000-00 ou seu@email.com" autocomplete="username" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label for="munSenha" class="form-label small fw-bold">Senha:</label>
+                                    <input type="password" id="munSenha" class="form-control" autocomplete="current-password" required>
+                                </div>
+                                <div class="mb-3 text-end">
+                                    <a href="#" class="small" onclick="event.preventDefault(); esqueciSenha('munEmail', 'msgMunEntrar');">Esqueci minha senha</a>
+                                </div>
+                                <div id="msgMunEntrar" class="alert py-2 small d-none" role="alert"></div>
+                                <button type="submit" class="btn btn-primary w-100 fw-bold py-2">Entrar</button>
+                            </form>
+                        </div>
+                        <!-- Criar conta -->
+                        <div class="tab-pane fade" id="painelMunCadastrar" role="tabpanel">
+                            <form onsubmit="event.preventDefault(); cadastrarMunicipe();">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label for="cadNome" class="form-label small fw-bold">Nome completo</label>
+                                        <input type="text" id="cadNome" class="form-control" maxlength="120" autocomplete="name" required>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label for="cadCpf" class="form-label small fw-bold">CPF</label>
+                                        <input type="text" id="cadCpf" class="form-control" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" required>
+                                        <div class="form-text">Você vai poder entrar e consultar seus pedidos usando o CPF.</div>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label for="cadSus" class="form-label small fw-bold">Número do Cartão SUS</label>
+                                        <input type="text" id="cadSus" class="form-control mascara-sus" placeholder="000.0000.0000.0000" inputmode="numeric" maxlength="19" required>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label for="cadNasc" class="form-label small fw-bold">Data de nascimento</label>
+                                        <input type="date" id="cadNasc" class="form-control" required>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label for="cadTel" class="form-label small fw-bold">Telefone / WhatsApp</label>
+                                        <input type="tel" id="cadTel" class="form-control" placeholder="(61) 98712-3456" maxlength="16" autocomplete="tel" required>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label for="cadEmail" class="form-label small fw-bold">E-mail</label>
+                                        <input type="email" id="cadEmail" class="form-control" autocomplete="email" required>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label for="cadSenha" class="form-label small fw-bold">Crie uma senha (mín. 8 caracteres)</label>
+                                        <input type="password" id="cadSenha" class="form-control" minlength="8" autocomplete="new-password" required>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label for="cadSenha2" class="form-label small fw-bold">Repita a senha</label>
+                                        <input type="password" id="cadSenha2" class="form-control" minlength="8" autocomplete="new-password" required>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check p-3 bg-light rounded border">
+                                            <input class="form-check-input ms-0 me-2" type="checkbox" id="cadLgpd" required>
+                                            <label class="form-check-label small text-muted" for="cadLgpd">
+                                                Autorizo o uso dos meus dados de identificação e saúde exclusivamente para agendamento e triagem na rede pública municipal de Cidade Ocidental (LGPD - Lei nº 13.709/2018).
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="msgMunCadastrar" class="alert py-2 small d-none mt-3" role="alert"></div>
+                                <button type="submit" id="btnCadastrar" class="btn btn-success w-100 fw-bold py-2 mt-3">Criar minha conta</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 9. MODAL DO SERVIDOR: ENTRAR / SOLICITAR ACESSO -->
+    <div class="modal fade" id="modalServidor" tabindex="-1" aria-labelledby="modalServidorLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header text-white" style="background-color: var(--azul-gov);">
+                    <h5 class="modal-title fw-bold" id="modalServidorLabel">
+                        <i class="bi bi-shield-lock-fill me-2" aria-hidden="true"></i>Acesso do Servidor Municipal
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <ul class="nav nav-tabs mb-3" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="abaSrvEntrar" data-bs-toggle="tab" data-bs-target="#painelSrvEntrar" type="button" role="tab">Entrar</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="abaSrvSolicitar" data-bs-toggle="tab" data-bs-target="#painelSrvSolicitar" type="button" role="tab">Solicitar acesso</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="painelSrvEntrar" role="tabpanel">
+                            <form onsubmit="event.preventDefault(); entrarServidor();">
+                                <div class="mb-3">
+                                    <label for="srvEmail" class="form-label small fw-bold">E-mail institucional:</label>
+                                    <input type="email" id="srvEmail" class="form-control" autocomplete="username" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label for="srvSenha" class="form-label small fw-bold">Senha:</label>
+                                    <input type="password" id="srvSenha" class="form-control" autocomplete="current-password" required>
+                                </div>
+                                <div class="mb-3 text-end">
+                                    <a href="#" class="small" onclick="event.preventDefault(); esqueciSenha('srvEmail', 'msgSrvEntrar');">Esqueci minha senha</a>
+                                </div>
+                                <div id="msgSrvEntrar" class="alert py-2 small d-none" role="alert"></div>
+                                <button type="submit" class="btn btn-primary w-100 fw-bold py-2">Entrar no Painel CRM</button>
+                            </form>
+                        </div>
+                        <div class="tab-pane fade" id="painelSrvSolicitar" role="tabpanel">
+                            <p class="small text-muted">Preencha seus dados. Um administrador da Secretaria de Saúde precisa <strong>aprovar</strong> o acesso antes do primeiro login.</p>
+                            <form onsubmit="event.preventDefault(); solicitarAcessoServidor();">
+                                <div class="mb-2">
+                                    <label for="reqNome" class="form-label small fw-bold">Nome completo</label>
+                                    <input type="text" id="reqNome" class="form-control" maxlength="120" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label for="reqMatricula" class="form-label small fw-bold">Matrícula / cargo</label>
+                                    <input type="text" id="reqMatricula" class="form-control" maxlength="30" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label for="reqEmail" class="form-label small fw-bold">E-mail institucional</label>
+                                    <input type="email" id="reqEmail" class="form-control" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="reqSenha" class="form-label small fw-bold">Senha (mín. 8 caracteres)</label>
+                                    <input type="password" id="reqSenha" class="form-control" minlength="8" autocomplete="new-password" required>
+                                </div>
+                                <div id="msgSrvSolicitar" class="alert py-2 small d-none" role="alert"></div>
+                                <button type="submit" class="btn btn-outline-primary w-100 fw-bold py-2">Enviar pedido de acesso</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 10. RODAPÉ INSTITUCIONAL -->
+    <footer class="bg-dark text-white py-4 mt-5">
+        <div class="container text-center text-md-start">
+            <div class="row align-items-center g-3">
+                <div class="col-12 col-md-6">
+                    <h5 class="fw-bold mb-1">Agiliza Saúde</h5>
+                    <p class="small text-secondary mb-0">
+                        Projeto Integrador UNICEPLAC • Análise e Desenvolvimento de Sistemas<br>
+                        Parceria com a Secretaria de Saúde de Cidade Ocidental (GO).
+                    </p>
+                </div>
+                <div class="col-12 col-md-6 text-md-end">
+                    <small class="text-secondary d-block">Stack: Firebase (Hosting, Authentication, Firestore) • Bootstrap 5</small>
+                    <small class="text-secondary">© 2026 Todos os direitos reservados.</small>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- WIDGET VLIBRAS -->
+    <div vw class="enabled">
+        <div vw-access-button class="active"></div>
+        <div vw-plugin-wrapper>
+            <div class="vw-plugin-top-wrapper"></div>
+        </div>
+    </div>
+    <script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
+    <script>
+        new window.VLibras.Widget('https://vlibras.gov.br/app');
+    </script>
+
+    <!-- SCRIPT OFICIAL DO GOOGLE TRADUTOR -->
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'pt',
+                includedLanguages: 'en,es,fr,de,it,pt',
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+                autoDisplay: false
+            }, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Firebase (Authentication + Firestore) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="js/firebase-init.js"></script>
+    <script src="js/comum.js"></script>
+
+    <script src="js/site.js"></script>
+</body>
+</html>

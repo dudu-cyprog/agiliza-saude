@@ -1,0 +1,35 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Rodar servidor (Jetty)",
+            "type": "shell",
+            "command": "${env:USERPROFILE}\\tools\\apache-maven-3.9.9\\bin\\mvn.cmd",
+            "args": ["jetty:run"],
+            "isBackground": true,
+            "group": { "kind": "build", "isDefault": true },
+            "problemMatcher": {
+                "pattern": { "regexp": "^\\[ERROR\\] (.*)$", "message": 1 },
+                "background": {
+                    "activesBegin": true,
+                    "beginsPattern": "Building Agiliza Saude",
+                    "endsPattern": "Started Server|Started ServerConnector"
+                }
+            }
+        },
+        {
+            "label": "Compilar (mvn package)",
+            "type": "shell",
+            "command": "${env:USERPROFILE}\\tools\\apache-maven-3.9.9\\bin\\mvn.cmd",
+            "args": ["-B", "package"],
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Instalar banco MySQL",
+            "type": "shell",
+            "command": "${workspaceFolder}\\instalar-banco.cmd",
+            "problemMatcher": []
+        }
+    ]
+}

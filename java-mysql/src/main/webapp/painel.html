@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel CRM • Agiliza Saúde</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background: #f8fafc; color: #334155; }
+        .navbar-custom { background-color: #0a3d62; border-bottom: 3px solid #00a8ff; }
+        .cartao-numero { font-size: 1.8rem; font-weight: 700; }
+        #comprovante { display: none; }
+        @media print {
+            body > *:not(#comprovante) { display: none !important; }
+            #comprovante { display: block !important; color: #000; font-size: 14px; max-width: 520px; margin: 0 auto; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark navbar-custom">
+        <div class="container-fluid px-4">
+            <span class="navbar-brand fw-bold">
+                <i class="bi bi-heart-pulse-fill text-info me-2" aria-hidden="true"></i>Agiliza Saúde • Painel CRM
+            </span>
+            <div class="d-flex align-items-center gap-3 text-white">
+                <span class="small"><i class="bi bi-person-badge me-1"></i><span id="nomeUsuario">...</span>
+                    <span class="badge bg-info text-dark ms-1" id="perfilUsuario"></span></span>
+                <button class="btn btn-outline-light btn-sm" onclick="sair()">
+                    <i class="bi bi-box-arrow-right me-1"></i>Sair
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container-fluid px-4 py-4">
+        <!-- Indicadores (calculados sobre a lista carregada) -->
+        <div class="row g-3 mb-3" id="resumo"></div>
+
+        <!-- ATENDIMENTO PRESENCIAL (BALCÃO): 1) CPF  2) pedido  3) comprovante -->
+        <div class="card border-success shadow-sm mb-3">
+            <div class="card-header bg-success-subtle d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-success"><i class="bi bi-person-plus me-1"></i>Atendimento presencial (balcão)</span>
+                <button class="btn btn-sm btn-success" data-bs-toggle="collapse" data-bs-target="#corpoBalcao">Abrir / fechar</button>
+            </div>
+            <div class="collapse" id="corpoBalcao">
+                <div class="card-body">
+                    <p class="small text-muted">Para quem foi pessoalmente à UBS. A pessoa não precisa de e-mail: acompanha pelo CPF no site.</p>
+                    <form class="row g-2 align-items-end" onsubmit="event.preventDefault(); balBuscar();">
+                        <div class="col-12 col-md-5">
+                            <label for="balCpf" class="form-label fw-bold"><span class="badge bg-success rounded-pill">1</span> CPF da pessoa</label>
+                            <input type="text" id="balCpf" class="form-control form-control-lg" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" required>
+                        </div>
+                        <div class="col-6 col-md-2"><button class="btn btn-success btn-lg w-100" type="submit">Buscar</button></div>
+                        <div class="col-6 col-md-2"><button class="btn btn-outline-secondary btn-lg w-100" type="button" onclick="balNovo()">Limpar</button></div>
+                    </form>
+                    <div id="balResultado" class="mt-2"></div>
+
+                    <div id="balCadastro" class="row g-2 mt-1 d-none">
+                        <div class="col-12 col-md-5"><label class="form-label fw-bold" for="balNome">Nome completo</label><input id="balNome" class="form-control" maxlength="120"></div>
+                        <div class="col-6 col-md-3"><label class="form-label fw-bold" for="balNasc">Nascimento</label><input id="balNasc" type="date" class="form-control"></div>
+                        <div class="col-6 col-md-2"><label class="form-label fw-bold" for="balTel">Telefone <small class="text-muted">(opc.)</small></label><input id="balTel" class="form-control" maxlength="16"></div>
+                        <div class="col-12 col-md-2"><label class="form-label fw-bold" for="balSus">Cartão SUS <small class="text-muted">(opc.)</small></label><input id="balSus" class="form-control" maxlength="19"></div>
+                        <div class="col-12"><label class="form-check small"><input type="checkbox" id="balLgpd" class="form-check-input">
+                            <strong>Li para a pessoa e ela autorizou</strong> o uso dos dados para agendamento e triagem (LGPD).</label></div>
+                    </div>
+
+                    <div id="balPasso2" class="row g-2 mt-2 d-none">
+                        <div class="col-12"><span class="badge bg-success rounded-pill">2</span> <strong>O que a pessoa precisa?</strong></div>
+                        <div class="col-12 col-md-4"><label class="form-label fw-bold" for="balServico">Serviço</label><select id="balServico" class="form-select" onchange="balServicoMudou()"></select></div>
+                        <div class="col-12 col-md-4"><label class="form-label fw-bold" for="balUbs">UBS</label><select id="balUbs" class="form-select"></select></div>
+                        <div class="col-12 col-md-4"><label class="form-label fw-bold" for="balGuia">Foto da guia <small class="text-muted">(opcional)</small></label><input id="balGuia" type="file" class="form-control" accept="image/*,application/pdf" capture="environment"></div>
+                        <div class="col-12 d-none" id="balCirurgia">
+                            <div class="row g-2 border rounded-3 p-2 mx-0" style="background:#eef6ff;">
+                                <div class="col-12 col-md-6"><label class="form-label small fw-bold" for="balProcedimento">Procedimento</label><input id="balProcedimento" class="form-control" maxlength="160" list="listaProcedimentos"></div>
+                                <div class="col-12 col-md-6"><label class="form-label small fw-bold" for="balHospital">Hospital de referência</label><input id="balHospital" class="form-control" maxlength="160" list="listaHospitais"></div>
+                                <div class="col-12 small"><strong>Pré-operatório já feito:</strong>
+                                    <label class="form-check form-check-inline mb-0"><input type="checkbox" class="form-check-input" id="balPreExames"> Exames</label>
+                                    <label class="form-check form-check-inline mb-0"><input type="checkbox" class="form-check-input" id="balPreRisco"> Risco cirúrgico</label>
+                                    <label class="form-check form-check-inline mb-0"><input type="checkbox" class="form-check-input" id="balPreTermo"> Termo</label>
+                                    <label class="form-check form-check-inline mb-0"><input type="checkbox" class="form-check-input" id="balPreOrientado"> Orientado</label>
+                                </div>
+                                <datalist id="listaProcedimentos"><option value="Catarata"><option value="Hérnia inguinal"><option value="Retirada de vesícula (colecistectomia)"><option value="Laqueadura"><option value="Vasectomia"><option value="Varizes"><option value="Prótese de joelho"></datalist>
+                                <datalist id="listaHospitais"><option value="Hospital Municipal de Cidade Ocidental"><option value="Hospital Regional de Luziânia"><option value="Hospital Regional do Gama (DF)"></datalist>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3"><label class="form-label fw-bold" for="balPrioridade">Prioridade <span class="badge bg-dark">interno</span></label><select id="balPrioridade" class="form-select"></select></div>
+                        <div class="col-6 col-md-4"><label class="form-label fw-bold" for="balMotivo">Motivo</label><input id="balMotivo" class="form-control" maxlength="200" list="listaMotivos"></div>
+                        <div class="col-12 col-md-5"><label class="form-label fw-bold" for="balObs">Observação interna <small class="text-muted">(opc.)</small></label><input id="balObs" class="form-control" maxlength="300"></div>
+                        <div class="col-12"><div id="balErro" class="alert alert-danger py-2 small d-none mb-2"></div>
+                            <button class="btn btn-success btn-lg w-100 fw-bold" id="balBtn" onclick="balRegistrar()">Registrar pedido</button></div>
+                    </div>
+
+                    <div id="balPasso3" class="alert alert-success text-center mt-3 d-none">
+                        <div><span class="badge bg-success rounded-pill">3</span> <strong>Pedido registrado!</strong></div>
+                        <div class="display-6 fw-bold" id="balProtocolo"></div>
+                        <div class="d-flex flex-wrap justify-content-center gap-2 mt-2">
+                            <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir comprovante</button>
+                            <a class="btn btn-success" id="balWpp" target="_blank" rel="noopener"><i class="bi bi-whatsapp me-1"></i>WhatsApp</a>
+                            <button class="btn btn-outline-secondary" onclick="balNovo()">Próximo atendimento</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AGENDAS E MÉDICOS: oferta de vagas + "Preencher com a fila" (criar/marcar só Regulador/Admin) -->
+        <div class="card border-primary shadow-sm mb-3">
+            <div class="card-header bg-primary-subtle d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-primary"><i class="bi bi-calendar-week me-1"></i>Agendas e médicos</span>
+                <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#corpoAgendas">Abrir / fechar</button>
+            </div>
+            <div class="collapse" id="corpoAgendas">
+                <div class="card-body">
+                    <div id="agAviso" class="alert alert-warning small d-none">Você pode ver as agendas. Criar agendas e marcar vagas é só do <strong>Regulador</strong> ou <strong>Administrador</strong>.</div>
+                    <div class="row g-4">
+                        <div class="col-12 col-xl-5">
+                            <h6 class="fw-bold"><i class="bi bi-person-vcard me-1"></i>Profissionais</h6>
+                            <div id="listaProfissionais" class="small mb-2">Carregando...</div>
+                            <!-- quem não trabalha mais: fica guardado (adormecido), pode ser reativado -->
+                            <details id="blocoInativos" class="small mb-2 d-none">
+                                <summary class="fw-bold text-muted"><i class="bi bi-moon me-1"></i>Desativados (<span id="qtdInativos">0</span>) — dados guardados</summary>
+                                <div id="listaInativos" class="mt-2"></div>
+                            </details>
+                            <details class="soRegulador" id="formProf">
+                                <summary class="small fw-bold text-primary" id="tituloFormProf" onclick="if (!document.getElementById('formProf').open) limparFormProf()">+ Cadastrar profissional</summary>
+                                <input type="hidden" id="prId">
+                                <div class="row g-2 mt-1">
+                                    <div class="col-12 col-md-6"><input id="prNome" class="form-control form-control-sm" placeholder="Nome (ex.: Dra. Ana Lima)" maxlength="120"></div>
+                                    <div class="col-6 col-md-3"><input id="prEsp" class="form-control form-control-sm" placeholder="Especialidade" maxlength="80" list="listaEspecialidades"></div>
+                                    <div class="col-6 col-md-3"><input id="prReg" class="form-control form-control-sm" placeholder="CRM (opc.)" maxlength="40"></div>
+                                    <div class="col-12 col-md-6"><select id="prServico" class="form-select form-select-sm agServicos"></select></div>
+                                    <div class="col-12 col-md-6"><input id="prLocal" class="form-control form-control-sm" placeholder="Local de atendimento" maxlength="160"></div>
+                                    <div class="col-12 small" id="prDias"></div>
+                                    <div class="col-4"><label class="small">Início</label><input id="prIni" type="time" class="form-control form-control-sm" value="07:00"></div>
+                                    <div class="col-4"><label class="small">Fim</label><input id="prFim" type="time" class="form-control form-control-sm" value="11:00"></div>
+                                    <div class="col-4"><label class="small">Min/consulta</label><input id="prDur" type="number" min="5" max="240" class="form-control form-control-sm" value="20"></div>
+                                    <div class="col-12 small fw-bold mt-2"><i class="bi bi-airplane me-1"></i>Férias / afastamento <span class="fw-normal text-muted">(opcional — nesses dias não gera agenda)</span></div>
+                                    <div class="col-6 col-md-4"><label class="small">De</label><input id="prFeriasIni" type="date" class="form-control form-control-sm"></div>
+                                    <div class="col-6 col-md-4"><label class="small">Até</label><input id="prFeriasFim" type="date" class="form-control form-control-sm"></div>
+                                    <div class="col-12 col-md-4"><label class="small">Motivo</label><input id="prFeriasMotivo" class="form-control form-control-sm" maxlength="80" list="listaMotivosAfast" placeholder="Férias"></div>
+                                    <datalist id="listaMotivosAfast"><option value="Férias"><option value="Licença médica"><option value="Licença-maternidade"><option value="Congresso / curso"><option value="Afastamento"></datalist>
+                                    <div class="col-12"><button class="btn btn-sm btn-primary w-100" onclick="criarProfissional()">Salvar profissional</button></div>
+                                </div>
+                            </details>
+                        </div>
+                        <div class="col-12 col-xl-7">
+                            <h6 class="fw-bold" id="tituloAgendas"><i class="bi bi-calendar3 me-1"></i>Agenda</h6>
+                            <datalist id="listaEspecialidades"></datalist>
+                            <div id="listaAgendas" class="small mb-2">Carregando...</div>
+                            <details class="soRegulador">
+                                <summary class="small fw-bold text-primary">+ Agenda avulsa (mutirão, dia extra)</summary>
+                                <div class="row g-2 mt-1">
+                                    <div class="col-12 col-md-6"><select id="avServico" class="form-select form-select-sm agServicos"></select></div>
+                                    <div class="col-12 col-md-6"><input id="avLocal" class="form-control form-control-sm" placeholder="Local" maxlength="160"></div>
+                                    <div class="col-6 col-md-3"><label class="small">Data</label><input id="avData" type="date" class="form-control form-control-sm"></div>
+                                    <div class="col-6 col-md-3"><label class="small">Início</label><input id="avIni" type="time" class="form-control form-control-sm" value="08:00"></div>
+                                    <div class="col-6 col-md-3"><label class="small">Vagas</label><input id="avVagas" type="number" min="1" max="200" class="form-control form-control-sm" value="20"></div>
+                                    <div class="col-6 col-md-3"><label class="small">Min/pessoa</label><input id="avInt" type="number" min="5" max="240" class="form-control form-control-sm" value="15"></div>
+                                    <div class="col-12"><input id="avOri" class="form-control form-control-sm" placeholder="Orientações ao paciente (ex.: jejum de 8 horas)" maxlength="500"></div>
+                                    <div class="col-12"><button class="btn btn-sm btn-primary w-100" onclick="criarAgendaAvulsa()">Criar agenda</button></div>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <form class="row g-2 align-items-end" onsubmit="event.preventDefault(); carregar();">
+                    <div class="col-12 col-md-3">
+                        <label for="filtroBusca" class="form-label small fw-bold">Buscar (protocolo, nome, CPF ou Cartão SUS)</label>
+                        <input type="text" id="filtroBusca" class="form-control" maxlength="60">
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label for="filtroStatus" class="form-label small fw-bold">Status</label>
+                        <select id="filtroStatus" class="form-select"><option value="">Todos</option></select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label for="filtroPrioridade" class="form-label small fw-bold">Prioridade</label>
+                        <select id="filtroPrioridade" class="form-select"><option value="">Todas</option></select>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label for="filtroEspera" class="form-label small fw-bold">Tempo de espera</label>
+                        <select id="filtroEspera" class="form-select">
+                            <option value="">Todos</option>
+                            <option value="15">Em aberto há 15+ dias</option>
+                            <option value="30">Em aberto há 30+ dias</option>
+                            <option value="60">Em aberto há 60+ dias</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i>Filtrar</button>
+                    </div>
+                    <div class="col-12 small text-muted">
+                        A lista já vem na <strong>ordem da fila</strong> (calculada no MySQL): em aberto primeiro, por prioridade
+                        (Urgente → Prioritário → Normal) e, dentro dela, quem espera há mais tempo.
+                        Espera: <span class="badge bg-success">até 14 dias</span>
+                        <span class="badge bg-warning text-dark">15 a 29</span>
+                        <span class="badge bg-danger">30 ou mais</span>.
+                        <i class="bi bi-eye-slash ms-1"></i> <strong>Prioridade é interna</strong>: a consulta do cidadão nunca recebe esse dado.
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="avisoPainel" class="alert d-none" role="alert"></div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Prioridade</th><th>Protocolo</th><th>Paciente</th><th>Serviço</th><th>UBS</th>
+                            <th>Status</th><th>Data do pedido</th><th>Tempo de espera</th><th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoTabela"><tr><td colspan="9" class="text-center text-muted py-4">Carregando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal de atualização -->
+    <div class="modal fade" id="modalStatus" tabindex="-1" aria-labelledby="tituloModalStatus" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="tituloModalStatus">Atualizar solicitação</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <form onsubmit="event.preventDefault(); salvar();">
+                    <div class="modal-body">
+                        <p class="small mb-3" id="resumoModal"></p>
+                        <!-- cirurgia eletiva: checklist do pré-operatório -->
+                        <div class="border rounded-3 p-2 mb-3 small d-none" id="cirurgiaModal" style="background:#eef6ff;">
+                            <div class="fw-bold text-primary mb-1" id="cirurgiaTitulo"></div>
+                            <strong>Pré-operatório:</strong>
+                            <label class="form-check form-check-inline mb-0"><input type="checkbox" class="form-check-input" id="mPreExames"> Exames</label>
+                            <label class="form-check form-check-inline mb-0"><input type="checkbox" class="form-check-input" id="mPreRisco"> Risco cirúrgico</label>
+                            <label class="form-check form-check-inline mb-0"><input type="checkbox" class="form-check-input" id="mPreTermo"> Termo</label>
+                            <label class="form-check form-check-inline mb-0"><input type="checkbox" class="form-check-input" id="mPreOrientado"> Orientado</label>
+                        </div>
+
+                        <!-- Prioridade (interna) -->
+                        <div class="border rounded-3 p-3 mb-3" style="background:#fff8e6;">
+                            <h6 class="fw-bold mb-2"><i class="bi bi-sort-up me-1"></i>Prioridade na fila
+                                <span class="badge bg-dark ms-1"><i class="bi bi-eye-slash me-1"></i>interno — o cidadão não vê</span></h6>
+                            <div class="row g-2">
+                                <div class="col-12 col-md-4">
+                                    <label for="novaPrioridade" class="form-label small fw-bold">Prioridade</label>
+                                    <select id="novaPrioridade" class="form-select"></select>
+                                </div>
+                                <div class="col-12 col-md-8">
+                                    <label for="motivoPrioridade" class="form-label small fw-bold">Motivo (interno)</label>
+                                    <input type="text" id="motivoPrioridade" class="form-control" maxlength="200" list="listaMotivos"
+                                           placeholder="Ex.: Idoso 80+, gestante, oncologia, risco clínico">
+                                    <datalist id="listaMotivos">
+                                        <option value="Idoso 80+ (prioridade legal)"><option value="Idoso 60+ (prioridade legal)">
+                                        <option value="Gestante"><option value="Pessoa com deficiência"><option value="Oncologia">
+                                        <option value="Risco clínico (avaliação médica)">
+                                    </datalist>
+                                </div>
+                                <div class="col-12 small text-muted" id="infoPrioridade"></div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="novoStatus" class="form-label small fw-bold">Novo status</label>
+                            <select id="novoStatus" class="form-select" required onchange="mostrarMarcacao()"></select>
+                        </div>
+                        <!-- Agendada: escolher quem atende, o dia e o horário (só dias e horários livres de verdade) -->
+                        <div id="blocoMarcar" class="border rounded-3 p-3 mb-3 bg-light d-none">
+                            <h6 class="fw-bold text-primary mb-2"><i class="bi bi-calendar-plus me-1"></i>Marcar na agenda</h6>
+                            <div class="row g-2">
+                                <div class="col-12 col-md-5"><label for="mkProf" class="form-label small fw-bold">1. Quem vai atender</label>
+                                    <select id="mkProf" class="form-select" onchange="seletorMudouProf('mk')"></select></div>
+                                <div class="col-7 col-md-4"><label for="mkDia" class="form-label small fw-bold">2. Dia</label>
+                                    <select id="mkDia" class="form-select" onchange="seletorMudouDia('mk')"></select></div>
+                                <div class="col-5 col-md-3"><label for="mkHora" class="form-label small fw-bold">3. Horário</label>
+                                    <select id="mkHora" class="form-select" onchange="seletorMudouHora('mk')"></select></div>
+                                <div class="col-12 small" id="mkResumo"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="msgPublica" class="form-label small fw-bold">Mensagem ao munícipe (opcional)</label>
+                            <textarea id="msgPublica" class="form-control" rows="2" maxlength="500"
+                                      placeholder="Se vazio, será usada a mensagem padrão do status."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="obsInterna" class="form-label small fw-bold">Observação interna (não aparece ao munícipe)</label>
+                            <textarea id="obsInterna" class="form-control" rows="2" maxlength="500"></textarea>
+                        </div>
+                        <div id="erroModal" class="alert alert-danger py-2 small d-none"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="btnSalvar">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal da agenda: vagas do dia, preencher com a fila, liberar, lista do dia -->
+    <div class="modal fade" id="modalAgenda" tabindex="-1" aria-labelledby="tituloAgenda" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="tituloAgenda">Agenda</h5>
+                        <div class="small text-muted" id="subtituloAgenda"></div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button class="btn btn-success soRegulador" id="btnPreencher" onclick="preencherComFila()">
+                            <i class="bi bi-magic me-1"></i>Preencher com a fila</button>
+                        <button class="btn btn-primary d-none" id="btnConfirmar" onclick="confirmarMarcacoes()">
+                            <i class="bi bi-check2-all me-1"></i>Confirmar marcações</button>
+                        <button class="btn btn-outline-secondary ms-auto" onclick="imprimirListaDia()">
+                            <i class="bi bi-printer me-1"></i>Imprimir lista do dia</button>
+                        <button class="btn btn-outline-danger soRegulador" onclick="apagarAgenda(agendaAtual.id)">
+                            <i class="bi bi-trash me-1"></i>Apagar esta agenda</button>
+                    </div>
+                    <div id="agendaInfo" class="alert d-none small"></div>
+                    <!-- Reagendar: mover o paciente para outro médico / dia / horário -->
+                    <div id="painelReagendar" class="border border-primary rounded-3 p-2 mb-2 bg-primary-subtle d-none">
+                        <div class="fw-bold small mb-1"><i class="bi bi-arrow-left-right me-1"></i>Reagendar <span id="rgPaciente"></span></div>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-12 col-md-4"><label for="rgProf" class="form-label small fw-bold mb-0">Quem vai atender</label>
+                                <select id="rgProf" class="form-select form-select-sm" onchange="seletorMudouProf('rg')"></select></div>
+                            <div class="col-7 col-md-3"><label for="rgDia" class="form-label small fw-bold mb-0">Dia</label>
+                                <select id="rgDia" class="form-select form-select-sm" onchange="seletorMudouDia('rg')"></select></div>
+                            <div class="col-5 col-md-2"><label for="rgHora" class="form-label small fw-bold mb-0">Horário</label>
+                                <select id="rgHora" class="form-select form-select-sm" onchange="seletorMudouHora('rg')"></select></div>
+                            <div class="col-12 col-md-3 d-flex gap-1">
+                                <button class="btn btn-primary btn-sm flex-grow-1" id="btnReagendar" onclick="confirmarReagendar()">Confirmar</button>
+                                <button class="btn btn-light btn-sm" onclick="document.getElementById('painelReagendar').classList.add('d-none')">Cancelar</button>
+                            </div>
+                            <div class="col-12 small" id="rgResumo"></div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light"><tr><th>Vaga</th><th>Horário</th><th>Paciente</th><th>Prioridade / espera</th><th class="text-end">Ações</th></tr></thead>
+                            <tbody id="corpoAgenda"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="comprovante"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const COR_STATUS = {
+            RECEBIDA: 'bg-secondary', EM_TRIAGEM: 'bg-warning text-dark', EM_ANALISE_REGULACAO: 'bg-info text-dark',
+            AGENDADA: 'bg-primary', CONCLUIDA: 'bg-success', NEGADA: 'bg-danger', CANCELADA: 'bg-dark',
+            FALTOU: 'bg-danger-subtle text-danger-emphasis border border-danger-subtle'
+        };
+        const COR_PRIORIDADE = { URGENTE: 'bg-danger', PRIORITARIO: 'bg-warning text-dark', NORMAL: 'bg-secondary' };
+        const ABERTOS = ['RECEBIDA', 'EM_TRIAGEM', 'EM_ANALISE_REGULACAO'];
+        let solicitacoes = [];
+        let selecionada = null;
+        let modal;
+
+        function esc(t) {
+            const d = document.createElement('div');
+            d.textContent = t == null ? '' : String(t);
+            return d.innerHTML;
+        }
+        function formatarData(iso) {
+            return iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '';
+        }
+        function mascararSus(s) { return s ? s.replace(/^(\d{3})(\d{4})(\d{4})(\d{4})$/, '$1.$2.$3.$4') : ''; }
+        function mascararCpf(c) { return c ? c.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4') : ''; }
+        function textoDias(d) { return d === 0 ? 'menos de 1 dia' : d === 1 ? '1 dia' : d + ' dias'; }
+        function corEspera(d) { return d >= 30 ? 'bg-danger' : d >= 15 ? 'bg-warning text-dark' : 'bg-success'; }
+
+        async function api(url, opcoes) {
+            const resp = await fetch(url, opcoes);
+            let corpo = {};
+            try { corpo = await resp.json(); } catch (e) { /* sem corpo */ }
+            if (resp.status === 401) { window.location.href = 'index.html'; throw new Error('Sessão expirada'); }
+            if (!resp.ok) throw new Error(corpo.erro || 'Erro inesperado.');
+            return corpo;
+        }
+        function postJson(url, dados) {
+            return api(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+                body: JSON.stringify(dados)
+            });
+        }
+
+        function aviso(texto, tipo) {
+            const el = document.getElementById('avisoPainel');
+            if (!texto) { el.classList.add('d-none'); return; }
+            el.className = 'alert alert-' + tipo;
+            el.textContent = texto;
+        }
+
+        async function iniciar() {
+            modal = new bootstrap.Modal(document.getElementById('modalStatus'));
+            const eu = await api('api/auth/me');
+            document.getElementById('nomeUsuario').textContent = eu.nome;
+            document.getElementById('perfilUsuario').textContent = eu.perfil;
+
+            const status = await api('api/painel/status');
+            const opcoes = Object.entries(status).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
+            document.getElementById('filtroStatus').insertAdjacentHTML('beforeend', opcoes);
+            document.getElementById('novoStatus').innerHTML = opcoes;
+
+            const prios = await api('api/painel/prioridades');
+            const opPrio = Object.entries(prios).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
+            document.getElementById('filtroPrioridade').insertAdjacentHTML('beforeend', opPrio);
+            document.getElementById('novaPrioridade').innerHTML = opPrio;
+            document.getElementById('balPrioridade').innerHTML = opPrio;
+            document.getElementById('balPrioridade').value = 'NORMAL';
+
+            // atendimento presencial: todos os serviços (inclusive cirurgia) e UBS
+            servicosEquipe = await api('api/painel/balcao/servicos');
+            document.getElementById('balServico').innerHTML = servicosEquipe.map(s => `<option value="${s.id}">${esc(s.nome)}</option>`).join('');
+            const cat = await api('api/catalogo');
+            document.getElementById('balUbs').innerHTML = cat.ubs.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
+
+            // agendas e médicos
+            modalAgenda = new bootstrap.Modal(document.getElementById('modalAgenda'));
+            ehRegulador = eu.perfil === 'REGULADOR' || eu.perfil === 'ADMIN';
+            document.querySelectorAll('.soRegulador').forEach(el => el.classList.toggle('d-none', !ehRegulador));
+            document.getElementById('agAviso').classList.toggle('d-none', ehRegulador);
+            document.querySelectorAll('.agServicos').forEach(sel => {
+                sel.innerHTML = servicosEquipe.map(s => `<option value="${s.id}">${esc(s.nome)}</option>`).join('');
+            });
+            document.getElementById('listaEspecialidades').innerHTML = ESPECIALIDADES.map(e => `<option value="${esc(e)}">`).join('');
+            document.getElementById('prDias').innerHTML = 'Dias: ' + DIAS.map((d, i) =>
+                `<label class="form-check form-check-inline mb-0"><input type="checkbox" class="form-check-input prDia" value="${i}"> ${d}</label>`).join('');
+            await carregar();
+            await carregarAgendas();
+        }
+
+        // ---------------------------------------------------------------- agendas e médicos
+        const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+        let modalAgenda;
+        let ehRegulador = false;
+        let agendaAtual = null;     // detalhe da agenda aberta no modal
+        let propostas = [];          // [{numero, solicitacaoId}] do "Preencher com a fila"
+        let candidatos = [];
+
+        function dataBr(iso) { return iso ? iso.split('-').reverse().join('/') : ''; }
+        function diaSemana(iso) { return DIAS[new Date(iso + 'T00:00:00').getDay()]; }
+        function horaVaga(a, n) {
+            const [h, m] = a.horaInicio.split(':').map(Number);
+            const t = h * 60 + m + n * a.intervaloMin;
+            return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+        }
+
+        const DIAS_LONGO = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+        const ESPECIALIDADES = ['Cardiologia', 'Ortopedia', 'Oftalmologia', 'Dermatologia', 'Neurologia', 'Pediatria',
+            'Ginecologia e Obstetrícia', 'Psiquiatria', 'Endocrinologia', 'Urologia', 'Otorrinolaringologia', 'Gastroenterologia',
+            'Pneumologia', 'Reumatologia', 'Nefrologia', 'Geriatria', 'Angiologia / Vascular', 'Oncologia', 'Infectologia',
+            'Mastologia', 'Proctologia', 'Cirurgia geral', 'Clínica médica', 'Psicologia', 'Nutrição', 'Fisioterapia',
+            'Fonoaudiologia', 'Odontologia', 'Ultrassonografia', 'Raio-X', 'Tomografia', 'Mamografia', 'Eletrocardiograma', 'Laboratório'];
+        let profissionais = [];
+        let agendas = [];
+        let profSelecionado = null;  // id do profissional clicado; 0 = agendas avulsas; null = nenhum
+
+        function dataLonga(iso) { return DIAS_LONGO[new Date(iso + 'T12:00:00').getDay()] + ', ' + dataBr(iso); }
+        function agendasDe(profId) { return agendas.filter(a => (a.profissionalId || 0) === profId); }
+        function livresDe(lista) { return lista.reduce((t, a) => t + a.vagas - a.ocupadas, 0); }
+
+        async function carregarAgendas() {
+            try {
+                const [pr, ag] = await Promise.all([api('api/painel/agendas/profissionais'), api('api/painel/agendas/lista')]);
+                profissionais = pr.profissionais;
+                agendas = ag.agendas;
+                desenharProfissionais();
+                desenharAgendas();
+            } catch (e) {
+                document.getElementById('listaAgendas').textContent = e.message;
+            }
+        }
+
+        /** Lista de profissionais: clicar em um mostra SÓ a agenda dele ao lado. */
+        function desenharProfissionais() {
+            const cartao = (id, conteudo, extra) => `<div class="border rounded-3 p-2 mb-2 ${profSelecionado === id ? 'border-primary border-2 bg-primary-subtle' : ''} ${extra || ''}"
+                role="button" tabindex="0" onclick="selecionarProfissional(${id})" onkeydown="if(event.key==='Enter')selecionarProfissional(${id})">${conteudo}</div>`;
+            const resumo = lista => `<span class="badge ${lista.length ? 'bg-primary' : 'bg-secondary'}">${lista.length} dia(s) • ${livresDe(lista)} vaga(s) livre(s)</span>`;
+            const dadosProf = p => `<strong>${esc(p.nome)}</strong> <span class="badge bg-light text-dark border">${esc(p.especialidade)}</span>
+                <div class="text-muted">${esc(p.servico)} • ${esc(p.local)}${p.registro ? ' • ' + esc(p.registro) : ''}</div>
+                <div>${p.diasSemana.map(d => DIAS[d]).join(', ')} • ${esc(p.horaInicio)}–${esc(p.horaFim)} • ${p.duracaoMin} min → <strong>${p.vagasPorDia} vagas/dia</strong></div>`;
+            const ativos = profissionais.filter(p => p.ativo);
+            const inativos = profissionais.filter(p => !p.ativo);
+            document.getElementById('listaProfissionais').innerHTML = (ativos.length ? '' : '<div class="text-muted mb-2">Nenhum profissional ativo.</div>') +
+                ativos.map(p => cartao(p.id, `
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div>${dadosProf(p)}
+                            <div class="mt-1 d-flex flex-wrap gap-1">${resumo(agendasDe(p.id))} ${seloFerias(p)}</div></div>
+                        ${ehRegulador ? `<div class="d-flex flex-column gap-1" onclick="event.stopPropagation()">
+                            <button class="btn btn-sm btn-outline-primary text-nowrap" onclick="gerarAgendas(${p.id})" title="Cria as agendas das próximas 4 semanas">
+                                <i class="bi bi-calendar-plus me-1"></i>Gerar 4 semanas</button>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary" title="Editar cadastro, horários e férias" onclick="editarProfissional(${p.id})"><i class="bi bi-pencil me-1"></i>Editar</button>
+                                <button class="btn btn-outline-secondary" title="Não trabalha mais: desativa sem apagar os dados" onclick="desativarProfissional(${p.id})"><i class="bi bi-moon"></i></button>
+                            </div></div>` : ''}
+                    </div>`)).join('') +
+                cartao(0, `<strong><i class="bi bi-people me-1"></i>Agendas avulsas / mutirões</strong>
+                    <div class="text-muted">Dias extras sem médico fixo</div><div class="mt-1">${resumo(agendasDe(0))}</div>`);
+            // desativados: guardados (adormecidos), com o botão de reativar
+            document.getElementById('blocoInativos').classList.toggle('d-none', !inativos.length);
+            document.getElementById('qtdInativos').textContent = inativos.length;
+            document.getElementById('listaInativos').innerHTML = inativos.map(p => `
+                <div class="border rounded-3 p-2 mb-2 bg-light text-muted d-flex justify-content-between align-items-start gap-2">
+                    <div>${dadosProf(p)}<div class="mt-1"><span class="badge bg-secondary"><i class="bi bi-moon me-1"></i>Desativado${p.inativoDesde ? ' desde ' + dataBr(p.inativoDesde) : ''}</span></div></div>
+                    ${ehRegulador ? `<div class="d-flex flex-column gap-1">
+                        <button class="btn btn-sm btn-outline-success text-nowrap" onclick="reativarProfissional(${p.id})"><i class="bi bi-sunrise me-1"></i>Reativar</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="editarProfissional(${p.id})"><i class="bi bi-pencil me-1"></i>Editar</button></div>` : ''}
+                </div>`).join('');
+        }
+
+        function selecionarProfissional(id) {
+            profSelecionado = id;
+            desenharProfissionais();
+            desenharAgendas();
+            if (window.innerWidth < 1200) document.getElementById('tituloAgendas').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        /** Agenda só do profissional escolhido. */
+        function desenharAgendas() {
+            const el = document.getElementById('listaAgendas');
+            const titulo = document.getElementById('tituloAgendas');
+            if (profSelecionado === null) {
+                titulo.innerHTML = '<i class="bi bi-calendar3 me-1"></i>Agenda';
+                el.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-hand-index fs-2 d-block mb-2"></i>
+                    Clique em um <strong>médico ou médica</strong> para ver a agenda dele(a).</div>`;
+                return;
+            }
+            const p = profissionais.find(x => x.id === profSelecionado);
+            titulo.innerHTML = '<i class="bi bi-calendar3 me-1"></i>' + (p ? 'Agenda de ' + esc(p.nome) + ' <span class="text-muted fw-normal">(' + esc(p.especialidade) + ')</span>' : 'Agendas avulsas / mutirões');
+            const lista = agendasDe(profSelecionado);
+            if (!lista.length) {
+                el.innerHTML = '<div class="text-muted">' + (p ? 'Nenhum dia de atendimento nas próximas semanas. Clique em "Gerar 4 semanas".' : 'Nenhuma agenda avulsa. Crie um mutirão abaixo.') + '</div>';
+                return;
+            }
+            el.innerHTML = '<div class="list-group">' + lista.map(a => {
+                const pct = Math.round(100 * a.ocupadas / a.vagas);
+                const fim = horaVaga(a, a.vagas);
+                return `<div class="list-group-item list-group-item-action" role="button" onclick="abrirAgenda(${a.id})">
+                    <div class="d-flex justify-content-between align-items-center gap-2">
+                        <div><strong>${esc(dataLonga(a.data).replace(/^./, c => c.toUpperCase()))}</strong> • ${esc(a.horaInicio)}–${esc(fim)}
+                            <div class="text-muted">${esc(a.servico)} • ${esc(a.local)}</div></div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge ${a.ocupadas >= a.vagas ? 'bg-success' : 'bg-primary'}">${a.ocupadas}/${a.vagas} vagas</span>
+                            ${ehRegulador ? `<button class="btn btn-sm btn-outline-danger" title="Apagar esta agenda" onclick="event.stopPropagation(); apagarAgenda(${a.id})"><i class="bi bi-trash"></i></button>` : ''}
+                        </div>
+                    </div>
+                    <div class="progress mt-1" style="height:4px"><div class="progress-bar" style="width:${pct}%"></div></div>
+                </div>`;
+            }).join('') + '</div>';
+        }
+
+        async function apagarAgenda(id) {
+            const a = agendas.find(x => x.id === id) || agendaAtual;
+            const qtd = a ? a.ocupadas : 0;
+            if (!confirm('Apagar a agenda de ' + (a ? dataLonga(a.data) : 'este dia') + '?' +
+                (qtd ? '\n\n' + qtd + ' paciente(s) marcado(s) voltarão para a fila, sem perder o tempo de espera.' : ''))) return;
+            try {
+                const r = await postJson('api/painel/agendas/apagar', { id });
+                modalAgenda.hide();
+                aviso('Agenda apagada.' + (r.voltaramParaFila ? ' ' + r.voltaramParaFila + ' paciente(s) voltaram para a fila.' : ''), 'success');
+                await Promise.all([carregar(), carregarAgendas()]);
+            } catch (e) { aviso(e.message, 'danger'); }
+        }
+
+        // ---------------------------------------------------------------- seletor "médico -> dia -> horário"
+        // Usado ao marcar (janela do pedido) e ao reagendar (janela da agenda): só dias e horários livres.
+        const seletores = {};   // prefixo -> { servicoId, ignorar: {agendaId, vaga} }
+
+        function vagasLivres(a, ignorar) {
+            const ocupadas = new Set(a.ocupadasNums || []);
+            const hoje = new Date().toISOString().slice(0, 10);
+            const agora = new Date().getHours() * 60 + new Date().getMinutes();
+            const livres = [];
+            for (let n = 0; n < a.vagas; n++) {
+                if (ocupadas.has(n) || (ignorar && ignorar.agendaId === a.id && ignorar.vaga === n)) continue;
+                const [h, m] = horaVaga(a, n).split(':').map(Number);
+                if (a.data === hoje && h * 60 + m <= agora) continue; // já passou
+                livres.push(n);
+            }
+            return livres;
+        }
+
+        function montarSeletor(prefixo, servicoId, ignorar, profInicial) {
+            seletores[prefixo] = { servicoId, ignorar };
+            const doServico = profissionais.filter(p => p.ativo && p.servicoId === servicoId);
+            const outros = profissionais.filter(p => p.ativo && p.servicoId !== servicoId);
+            const op = p => `<option value="${p.id}">${esc(p.nome)} — ${esc(p.especialidade)} (${livresDe(agendasDe(p.id))} livres)</option>`;
+            const sel = document.getElementById(prefixo + 'Prof');
+            sel.innerHTML = '<option value="">Escolha o médico(a)...</option>' +
+                (doServico.length ? `<optgroup label="Atendem este serviço">${doServico.map(op).join('')}</optgroup>` : '') +
+                (outros.length ? `<optgroup label="Outros profissionais">${outros.map(op).join('')}</optgroup>` : '') +
+                `<optgroup label="Sem médico fixo"><option value="0">Agenda avulsa / mutirão (${livresDe(agendasDe(0))} livres)</option></optgroup>`;
+            sel.value = profInicial != null ? String(profInicial) : (doServico.length === 1 ? String(doServico[0].id) : '');
+            if (sel.selectedIndex < 0) sel.value = '';
+            seletorMudouProf(prefixo);
+        }
+
+        function seletorMudouProf(prefixo) {
+            const v = document.getElementById(prefixo + 'Prof').value;
+            const dia = document.getElementById(prefixo + 'Dia');
+            if (v === '') {
+                dia.innerHTML = '<option value="">—</option>';
+            } else {
+                const lista = agendasDe(Number(v))
+                    .filter(a => !deFerias(profissionais.find(p => p.id === a.profissionalId), a.data))   // de férias: não oferece
+                    .map(a => ({ a, livres: vagasLivres(a, seletores[prefixo].ignorar).length })).filter(x => x.livres > 0);
+                dia.innerHTML = lista.length
+                    ? '<option value="">Escolha o dia...</option>' + lista.map(({ a, livres }) =>
+                        `<option value="${a.id}">${diaSemana(a.data)} ${dataBr(a.data)} • ${esc(a.horaInicio)} • ${livres} livre(s)${v === '0' ? ' • ' + esc(a.servico) : ''}</option>`).join('')
+                    : '<option value="">Sem dias livres — gere mais agendas</option>';
+                if (lista.length === 1) dia.value = String(lista[0].a.id);
+            }
+            seletorMudouDia(prefixo);
+        }
+
+        function seletorMudouDia(prefixo) {
+            const a = agendas.find(x => String(x.id) === document.getElementById(prefixo + 'Dia').value);
+            document.getElementById(prefixo + 'Hora').innerHTML = a
+                ? '<option value="">Escolha...</option>' + vagasLivres(a, seletores[prefixo].ignorar).map(n => `<option value="${n}">${horaVaga(a, n)}</option>`).join('')
+                : '<option value="">—</option>';
+            seletorMudouHora(prefixo);
+        }
+
+        function seletorMudouHora(prefixo) {
+            const r = lerSeletor(prefixo);
+            const atual = prefixo === 'mk' && selecionada && selecionada.status === 'AGENDADA' && selecionada.agendaData ? selecionada : null;
+            document.getElementById(prefixo + 'Resumo').innerHTML = r
+                ? `<i class="bi bi-calendar-check text-success me-1"></i>Vai ficar: <strong>${esc(textoMarcacao(r.agenda, r.n))}</strong>`
+                : (atual ? `<i class="bi bi-calendar-event me-1"></i>Marcação atual: <strong>${esc(dataLonga(atual.agendaData))} às ${esc(atual.agendaHora)}${atual.agendaProfissional ? ' • ' + esc(atual.agendaProfissional) : ''}</strong>. Para mudar, escolha outro médico, dia e horário.` : '');
+        }
+
+        function lerSeletor(prefixo) {
+            const a = agendas.find(x => String(x.id) === document.getElementById(prefixo + 'Dia').value);
+            const h = document.getElementById(prefixo + 'Hora').value;
+            return a && h !== '' ? { agenda: a, n: Number(h) } : null;
+        }
+
+        function textoMarcacao(a, n) {
+            return dataLonga(a.data) + ' às ' + horaVaga(a, n) + ' • ' + a.local + (a.profissional ? ' • ' + a.profissional + ' (' + a.especialidade + ')' : '');
+        }
+
+        // ---------------------------------------------------------------- reagendar (janela da agenda)
+        let reagendando = null;   // { n, solicitacaoId }
+
+        function abrirReagendar(n) {
+            const a = agendaAtual;
+            const v = a.vagasOcupadas.find(x => x.numero === n);
+            reagendando = { n, solicitacaoId: v.solicitacaoId };
+            document.getElementById('rgPaciente').textContent = v.paciente + ' (hoje: ' + dataBr(a.data) + ' às ' + v.hora + ')';
+            montarSeletor('rg', a.servicoId, { agendaId: a.id, vaga: n }, a.profissionalId || 0);
+            const painel = document.getElementById('painelReagendar');
+            painel.classList.remove('d-none');
+            painel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        async function confirmarReagendar() {
+            const r = lerSeletor('rg');
+            if (!r) { agendaInfo('Escolha o médico, o dia e o horário.', 'warning'); return; }
+            const btn = document.getElementById('btnReagendar');
+            btn.disabled = true;
+            try {
+                const res = await postJson('api/painel/agendas/marcar',
+                    { agendaId: r.agenda.id, marcacoes: [{ numero: r.n, solicitacaoId: reagendando.solicitacaoId }] });
+                if (res.erros.length) throw new Error(res.erros.join(' '));
+                await Promise.all([carregar(), carregarAgendas()]);
+                await abrirAgenda(agendaAtual.id, true);
+                agendaInfo('Reagendado para <strong>' + esc(textoMarcacao(r.agenda, r.n)) + '</strong>. Avise o paciente pelo WhatsApp.', 'success');
+            } catch (e) { agendaInfo(esc(e.message), 'danger'); } finally { btn.disabled = false; }
+        }
+
+        // ---------------------------------------------------------------- cadastro: novo, editar, férias, desativar
+        function deFerias(p, data) { return !!(p && p.feriasInicio && data >= p.feriasInicio && data <= p.feriasFim); }
+
+        function seloFerias(p) {
+            const hoje = new Date().toISOString().slice(0, 10);
+            if (!p.feriasInicio || p.feriasFim < hoje) return '';
+            const motivo = esc(p.feriasMotivo || 'Férias');
+            return deFerias(p, hoje)
+                ? `<span class="badge bg-warning text-dark"><i class="bi bi-airplane me-1"></i>${motivo} até ${dataBr(p.feriasFim)}</span>`
+                : `<span class="badge bg-info-subtle text-info-emphasis border"><i class="bi bi-airplane me-1"></i>${motivo} marcadas: ${dataBr(p.feriasInicio)} a ${dataBr(p.feriasFim)}</span>`;
+        }
+
+        function limparFormProf() {
+            ['prId', 'prNome', 'prEsp', 'prReg', 'prLocal', 'prFeriasIni', 'prFeriasFim', 'prFeriasMotivo'].forEach(id => { document.getElementById(id).value = ''; });
+            document.querySelectorAll('.prDia').forEach(c => { c.checked = false; });
+            document.getElementById('tituloFormProf').textContent = '+ Cadastrar profissional';
+        }
+
+        /** Abre o formulário preenchido para atualizar o cadastro (local, dias, horários, férias...). */
+        function editarProfissional(id) {
+            const p = profissionais.find(x => x.id === id);
+            const v = (campo, valor) => { document.getElementById(campo).value = valor == null ? '' : valor; };
+            v('prId', p.id); v('prNome', p.nome); v('prEsp', p.especialidade); v('prReg', p.registro);
+            v('prServico', p.servicoId); v('prLocal', p.local); v('prIni', p.horaInicio); v('prFim', p.horaFim); v('prDur', p.duracaoMin);
+            v('prFeriasIni', p.feriasInicio); v('prFeriasFim', p.feriasFim); v('prFeriasMotivo', p.feriasMotivo);
+            document.querySelectorAll('.prDia').forEach(c => { c.checked = p.diasSemana.includes(Number(c.value)); });
+            document.getElementById('tituloFormProf').textContent = 'Editar: ' + p.nome;
+            const form = document.getElementById('formProf');
+            form.open = true;
+            form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        async function criarProfissional() {
+            const v = id => document.getElementById(id).value.trim();
+            const id = v('prId') ? Number(v('prId')) : null;
+            try {
+                const r = await postJson('api/painel/agendas/profissionais', {
+                    id, nome: v('prNome'), especialidade: v('prEsp'), registro: v('prReg'), servicoId: Number(v('prServico')),
+                    local: v('prLocal'), horaInicio: v('prIni'), horaFim: v('prFim'), duracaoMin: Number(v('prDur')),
+                    diasSemana: [...document.querySelectorAll('.prDia:checked')].map(c => Number(c.value)),
+                    feriasInicio: v('prFeriasIni'), feriasFim: v('prFeriasFim'), feriasMotivo: v('prFeriasMotivo')
+                });
+                const nome = v('prNome');
+                limparFormProf();
+                document.getElementById('formProf').open = false;
+                aviso(id ? 'Cadastro de ' + nome + ' atualizado.' : 'Profissional cadastrado. Agora clique em "Gerar 4 semanas".', 'success');
+                await carregarAgendas();
+                if (id && r.afetadas) await oferecerLimpar(id, nome + ' estará de férias/afastado(a)', r.afetadas);
+            } catch (e) { aviso(e.message, 'danger'); }
+        }
+
+        /** Pergunta se apaga os dias de agenda afetados (os marcados voltam para a fila). */
+        async function oferecerLimpar(id, motivo, qtd) {
+            if (!confirm(motivo + '.\n\nJá existem ' + qtd + ' dia(s) de agenda nesse período.\nApagar esses dias? ' +
+                'Quem estava marcado volta para a fila sem perder o tempo de espera.')) return;
+            const r = await postJson('api/painel/agendas/profissionais/limpar', { id });
+            aviso(r.dias + ' dia(s) de agenda apagado(s)' + (r.voltaramParaFila ? '; ' + r.voltaramParaFila +
+                ' paciente(s) voltaram para a fila — use "Preencher com a fila" em outro médico ou dia.' : '.'), 'success');
+            await Promise.all([carregar(), carregarAgendas()]);
+        }
+
+        /** "Não trabalha mais": desativa sem apagar nada (adormecido); pode ser reativado. */
+        async function desativarProfissional(id) {
+            const p = profissionais.find(x => x.id === id);
+            if (!confirm('Desativar ' + p.nome + '?\n\nO cadastro e o histórico ficam guardados (adormecido). ' +
+                'Ele(a) some das marcações e não gera mais agendas. Você pode reativar quando quiser.')) return;
+            try {
+                const r = await postJson('api/painel/agendas/profissionais/ativo', { id, ativo: false });
+                if (profSelecionado === id) profSelecionado = null;
+                aviso(p.nome + ' foi desativado(a). Os dados continuam guardados em "Desativados".', 'success');
+                await carregarAgendas();
+                if (r.afetadas) await oferecerLimpar(id, p.nome + ' foi desativado(a)', r.afetadas);
+            } catch (e) { aviso(e.message, 'danger'); }
+        }
+
+        async function reativarProfissional(id) {
+            const p = profissionais.find(x => x.id === id);
+            try {
+                await postJson('api/painel/agendas/profissionais/ativo', { id, ativo: true });
+                aviso(p.nome + ' foi reativado(a). Clique em "Gerar 4 semanas" para abrir vagas.', 'success');
+                await carregarAgendas();
+            } catch (e) { aviso(e.message, 'danger'); }
+        }
+
+        async function gerarAgendas(id) {
+            try {
+                const r = await postJson('api/painel/agendas/gerar', { id, semanas: 4 });
+                aviso(r.criadas ? r.criadas + ' agenda(s) criada(s).' : 'As próximas 4 semanas já tinham agenda.', 'success');
+                await carregarAgendas();
+            } catch (e) { aviso(e.message, 'danger'); }
+        }
+
+        async function criarAgendaAvulsa() {
+            const v = id => document.getElementById(id).value.trim();
+            try {
+                await postJson('api/painel/agendas/avulsa', {
+                    servicoId: Number(v('avServico')), local: v('avLocal'), data: v('avData'), horaInicio: v('avIni'),
+                    vagas: Number(v('avVagas')), intervaloMin: Number(v('avInt')), orientacoes: v('avOri')
+                });
+                aviso('Agenda criada.', 'success');
+                await carregarAgendas();
+            } catch (e) { aviso(e.message, 'danger'); }
+        }
+
+        function agendaInfo(texto, tipo) {
+            const el = document.getElementById('agendaInfo');
+            el.className = 'alert small alert-' + tipo + (texto ? '' : ' d-none');
+            el.innerHTML = texto || '';
+        }
+
+        async function abrirAgenda(id, manterAviso) {
+            try {
+                agendaAtual = await api('api/painel/agendas/detalhe?id=' + id);
+            } catch (e) { aviso(e.message, 'danger'); return; }
+            propostas = [];
+            candidatos = [];
+            const a = agendaAtual;
+            document.getElementById('tituloAgenda').textContent =
+                `${diaSemana(a.data)} ${dataBr(a.data)} • ${a.profissional ? a.profissional + ' (' + a.especialidade + ')' : 'Agenda avulsa'}`;
+            document.getElementById('subtituloAgenda').textContent =
+                `${a.servico} • ${a.local} • ${a.vagas} vagas de ${a.intervaloMin} min a partir das ${a.horaInicio}` + (a.orientacoes ? ' • ' + a.orientacoes : '');
+            document.getElementById('btnConfirmar').classList.add('d-none');
+            document.getElementById('painelReagendar').classList.add('d-none');
+            if (!manterAviso) agendaInfo('', 'info');
+            desenharAgenda();
+            modalAgenda.show();
+        }
+
+        function desenharAgenda() {
+            const a = agendaAtual;
+            const porNumero = {};
+            a.vagasOcupadas.forEach(v => { porNumero[v.numero] = v; });
+            const propPorNumero = {};
+            propostas.forEach(p => { propPorNumero[p.numero] = p.solicitacaoId; });
+            const opcoes = sel => '<option value="">— deixar livre —</option>' + candidatos.map(c =>
+                `<option value="${c.solicitacaoId}" ${c.solicitacaoId === sel ? 'selected' : ''}>#${esc(c.protocolo)} ${esc(c.paciente)} • ${esc(c.prioridade)} • ${textoDias(c.diasEspera)}</option>`).join('');
+            let linhas = '';
+            for (let n = 0; n < a.vagas; n++) {
+                const v = porNumero[n];
+                if (v) {
+                    const wpp = linkWhatsApp({ telefone: v.telefone, paciente: v.paciente, protocolo: v.protocolo, servico: a.servico,
+                        statusRotulo: 'Agendada', mensagemPublica: `Atendimento marcado: ${dataBr(a.data)} às ${v.hora} • ${a.local}.` + (a.orientacoes ? ' ' + a.orientacoes : '') });
+                    linhas += `<tr><td>${n + 1}</td><td class="fw-bold">${esc(v.hora)}</td>
+                        <td>${esc(v.paciente)}<div class="small text-muted">#${esc(v.protocolo)} • CPF ${esc(mascararCpf(v.cpf))}</div></td>
+                        <td><span class="badge ${COR_PRIORIDADE[v.prioridade] || 'bg-secondary'}">${esc(v.prioridade)}</span>
+                            <span class="small text-muted">${textoDias(v.diasEspera)}</span></td>
+                        <td class="text-end text-nowrap">
+                            ${wpp ? `<a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener" href="${esc(wpp)}" title="Avisar pelo WhatsApp"><i class="bi bi-whatsapp"></i></a>` : ''}
+                            ${ehRegulador ? `<button class="btn btn-sm btn-outline-primary" onclick="abrirReagendar(${n})" title="Mudar para outro médico, dia ou horário"><i class="bi bi-arrow-left-right me-1"></i>Reagendar</button>` : ''}
+                            ${ehRegulador ? `<button class="btn btn-sm btn-outline-danger" onclick="liberarVaga(${n})" title="Desmarcar: o pedido volta para a fila"><i class="bi bi-x-circle me-1"></i>Liberar</button>` : ''}
+                        </td></tr>`;
+                } else if (candidatos.length) {
+                    linhas += `<tr class="table-success"><td>${n + 1}</td><td class="fw-bold">${horaVaga(a, n)}</td>
+                        <td colspan="3"><select class="form-select form-select-sm propSel" data-numero="${n}">${opcoes(propPorNumero[n])}</select></td></tr>`;
+                } else {
+                    linhas += `<tr><td>${n + 1}</td><td>${horaVaga(a, n)}</td><td colspan="3" class="text-muted">livre</td></tr>`;
+                }
+            }
+            document.getElementById('corpoAgenda').innerHTML = linhas;
+        }
+
+        /** Sugere: vagas livres x próximos da fila do mesmo serviço (prioridade e, dentro dela, quem espera há mais tempo). */
+        async function preencherComFila() {
+            try {
+                const r = await api('api/painel/agendas/sugestao?id=' + agendaAtual.id);
+                if (!r.livres.length) { agendaInfo('Agenda lotada: não há vagas livres.', 'warning'); return; }
+                if (!r.candidatos.length) { agendaInfo('Ninguém na fila deste serviço aguardando marcação.', 'warning'); return; }
+                candidatos = r.candidatos;
+                propostas = r.propostas;
+                desenharAgenda();
+                document.getElementById('btnConfirmar').classList.remove('d-none');
+                agendaInfo(`<i class="bi bi-magic me-1"></i>Sugestão para <strong>${propostas.length}</strong> vaga(s), na ordem da fila
+                    (Urgente → Prioritário → Normal e, dentro de cada um, quem espera há mais tempo). Revise e clique em <strong>Confirmar marcações</strong>.`, 'success');
+            } catch (e) { agendaInfo(esc(e.message), 'danger'); }
+        }
+
+        async function confirmarMarcacoes() {
+            const marcacoes = [...document.querySelectorAll('.propSel')].filter(s => s.value)
+                .map(s => ({ numero: Number(s.dataset.numero), solicitacaoId: Number(s.value) }));
+            const ids = marcacoes.map(m => m.solicitacaoId);
+            if (!marcacoes.length) { agendaInfo('Nenhuma vaga com paciente escolhido.', 'warning'); return; }
+            if (new Set(ids).size !== ids.length) { agendaInfo('O mesmo pedido foi escolhido em duas vagas.', 'warning'); return; }
+            const btn = document.getElementById('btnConfirmar');
+            btn.disabled = true;
+            try {
+                const r = await postJson('api/painel/agendas/marcar', { agendaId: agendaAtual.id, marcacoes });
+                agendaInfo(`<strong>${r.marcadas}</strong> pessoa(s) marcada(s). O status mudou para "Agendada" com data, hora e local na consulta pelo CPF.` +
+                    (r.erros.length ? '<br>' + r.erros.map(esc).join('<br>') : ''), r.erros.length ? 'warning' : 'success');
+                await abrirAgenda(agendaAtual.id, true);
+                await Promise.all([carregar(), carregarAgendas()]);
+            } catch (e) { agendaInfo(esc(e.message), 'danger'); } finally { btn.disabled = false; }
+        }
+
+        async function liberarVaga(numero) {
+            if (!confirm('Liberar a vaga ' + (numero + 1) + '? O pedido volta para a fila sem perder o tempo de espera.')) return;
+            try {
+                await postJson('api/painel/agendas/liberar', { agendaId: agendaAtual.id, numero });
+                agendaInfo('Vaga liberada. O pedido voltou para a fila.', 'info');
+                await abrirAgenda(agendaAtual.id, true);
+                await Promise.all([carregar(), carregarAgendas()]);
+            } catch (e) { agendaInfo(esc(e.message), 'danger'); }
+        }
+
+        function imprimirListaDia() {
+            const a = agendaAtual;
+            document.getElementById('comprovante').innerHTML = `
+                <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:12px">
+                    <strong style="font-size:18px">Agiliza Saúde • Cidade Ocidental (GO)</strong><br>Lista de atendimentos do dia</div>
+                <p><strong>${diaSemana(a.data)} ${dataBr(a.data)}</strong> • ${esc(a.profissional ? a.profissional + ' (' + a.especialidade + ')' : 'Agenda avulsa')}<br>
+                ${esc(a.servico)} • ${esc(a.local)}</p>
+                <table style="width:100%;border-collapse:collapse" border="1" cellpadding="4">
+                    <tr><th>Hora</th><th>Paciente</th><th>CPF</th><th>Protocolo</th><th>Presença</th></tr>
+                    ${a.vagasOcupadas.map(v => `<tr><td>${esc(v.hora)}</td><td>${esc(v.paciente)}</td><td>${esc(mascararCpf(v.cpf))}</td>
+                        <td>#${esc(v.protocolo)}</td><td>☐ veio ☐ faltou</td></tr>`).join('') || '<tr><td colspan="5">Nenhum paciente marcado.</td></tr>'}
+                </table>
+                <p style="margin-top:8px">Total: ${a.vagasOcupadas.length} de ${a.vagas} vagas.</p>`;
+            window.print();
+        }
+
+        // ---------------------------------------------------------------- atendimento presencial (balcão)
+        let servicosEquipe = [];
+        let balEncontrado = null;   // cadastro existente ou null (novo)
+        let balUltimo = null;
+
+        function balErro(t) {
+            const el = document.getElementById('balErro');
+            el.textContent = t || '';
+            el.classList.toggle('d-none', !t);
+        }
+
+        function balNovo() {
+            ['balCpf', 'balNome', 'balNasc', 'balTel', 'balSus', 'balProcedimento', 'balHospital', 'balMotivo', 'balObs', 'balGuia']
+                .forEach(id => { document.getElementById(id).value = ''; });
+            ['balLgpd', 'balPreExames', 'balPreRisco', 'balPreTermo', 'balPreOrientado'].forEach(id => { document.getElementById(id).checked = false; });
+            document.getElementById('balPrioridade').value = 'NORMAL';
+            document.getElementById('balResultado').innerHTML = '';
+            ['balCadastro', 'balPasso2', 'balPasso3', 'balCirurgia'].forEach(id => document.getElementById(id).classList.add('d-none'));
+            balErro('');
+            balEncontrado = null;
+        }
+
+        function balSugerirPrioridade(idade) {
+            if (idade >= 80) { document.getElementById('balPrioridade').value = 'PRIORITARIO'; document.getElementById('balMotivo').value = 'Idoso 80+ (prioridade legal)'; }
+            else if (idade >= 60) { document.getElementById('balPrioridade').value = 'PRIORITARIO'; document.getElementById('balMotivo').value = 'Idoso 60+ (prioridade legal)'; }
+        }
+
+        async function balBuscar() {
+            const cpf = document.getElementById('balCpf').value.replace(/\D/g, '');
+            const res = document.getElementById('balResultado');
+            ['balCadastro', 'balPasso2', 'balPasso3'].forEach(id => document.getElementById(id).classList.add('d-none'));
+            balErro('');
+            if (cpf.length !== 11) { res.innerHTML = '<div class="alert alert-warning py-2 mb-0">Digite os 11 números do CPF.</div>'; return; }
+            const resp = await fetch('api/painel/balcao/paciente?cpf=' + cpf);
+            if (resp.status === 401) { window.location.href = 'index.html'; return; }
+            if (resp.ok) {
+                balEncontrado = await resp.json();
+                res.innerHTML = `<div class="alert alert-success py-2 mb-0"><strong>${esc(balEncontrado.nome)}</strong> • ${balEncontrado.idade} anos •
+                    tel. ${esc(balEncontrado.telefone || 'não informado')} •
+                    ${balEncontrado.cadastroPresencial ? '<span class="badge bg-secondary">cadastrado na UBS</span>' : '<span class="badge bg-primary">cadastro do site</span>'}
+                    • ${balEncontrado.pedidos} pedido(s), ${balEncontrado.abertos} em aberto</div>`;
+                balSugerirPrioridade(balEncontrado.idade);
+            } else {
+                balEncontrado = null;
+                res.innerHTML = '<div class="alert alert-warning py-2 mb-0">CPF sem cadastro. Preencha os dados abaixo.</div>';
+                document.getElementById('balCadastro').classList.remove('d-none');
+            }
+            document.getElementById('balPasso2').classList.remove('d-none');
+        }
+
+        function balServicoMudou() {
+            const s = servicosEquipe.find(x => String(x.id) === document.getElementById('balServico').value);
+            document.getElementById('balCirurgia').classList.toggle('d-none', !(s && s.somenteEquipe));
+        }
+
+        async function balRegistrar() {
+            balErro('');
+            const f = new FormData();
+            const v = (id) => document.getElementById(id).value.trim();
+            f.append('cpf', v('balCpf'));
+            if (!balEncontrado) {
+                if (v('balNome').length < 3 || !v('balNasc')) { balErro('Informe nome completo e data de nascimento.'); return; }
+                f.append('nome', v('balNome'));
+                f.append('nascimento', v('balNasc'));
+                f.append('telefone', v('balTel'));
+                f.append('sus', v('balSus'));
+                f.append('lgpd', document.getElementById('balLgpd').checked ? 'true' : 'false');
+            }
+            f.append('servicoId', v('balServico'));
+            f.append('ubsId', v('balUbs'));
+            f.append('prioridade', v('balPrioridade'));
+            f.append('motivo', v('balMotivo'));
+            f.append('observacao', v('balObs'));
+            f.append('procedimento', v('balProcedimento'));
+            f.append('hospital', v('balHospital'));
+            [['preopExames', 'balPreExames'], ['preopRisco', 'balPreRisco'], ['preopTermo', 'balPreTermo'], ['preopOrientado', 'balPreOrientado']]
+                .forEach(([campo, id]) => f.append(campo, document.getElementById(id).checked ? 'true' : 'false'));
+            const guia = document.getElementById('balGuia').files[0];
+            if (guia) f.append('guia', guia);
+
+            const btn = document.getElementById('balBtn');
+            btn.disabled = true;
+            try {
+                const r = await api('api/painel/balcao/pedido', { method: 'POST', headers: { 'X-Requested-With': 'fetch' }, body: f });
+                const servico = servicosEquipe.find(x => String(x.id) === v('balServico'));
+                const nome = balEncontrado ? balEncontrado.nome : v('balNome');
+                const tel = (balEncontrado ? balEncontrado.telefone : v('balTel')) || '';
+                balUltimo = { protocolo: r.protocolo, nome, cpf: v('balCpf'), servico: servico.nome + (servico.somenteEquipe ? ' — ' + v('balProcedimento') : ''),
+                    ubs: document.getElementById('balUbs').selectedOptions[0].text };
+                document.getElementById('balProtocolo').textContent = '#' + r.protocolo;
+                document.getElementById('comprovante').innerHTML = `
+                    <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:12px">
+                        <strong style="font-size:18px">Agiliza Saúde • Cidade Ocidental (GO)</strong><br>Comprovante de atendimento presencial</div>
+                    <div style="text-align:center;font-size:28px;font-weight:bold">Protocolo #${esc(r.protocolo)}</div>
+                    <p><strong>Paciente:</strong> ${esc(nome)}<br><strong>CPF:</strong> ${esc(balUltimo.cpf)}<br>
+                    <strong>Serviço:</strong> ${esc(balUltimo.servico)}<br><strong>UBS:</strong> ${esc(balUltimo.ubs)}<br>
+                    <strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}<br><strong>Atendido por:</strong> ${esc(document.getElementById('nomeUsuario').textContent)}</p>
+                    <div style="border:1px dashed #000;padding:8px">Acompanhe no site do Agiliza Saúde em "Acompanhar Solicitação" digitando o seu <strong>CPF</strong>.</div>`;
+                const wpp = linkWhatsApp({ telefone: tel, paciente: nome, protocolo: r.protocolo, servico: balUltimo.servico,
+                    statusRotulo: 'Recebida', mensagemPublica: 'Seu pedido foi registrado na ' + balUltimo.ubs + '.' });
+                const btnWpp = document.getElementById('balWpp');
+                btnWpp.classList.toggle('d-none', !wpp);
+                if (wpp) btnWpp.href = wpp;
+                document.getElementById('balPasso2').classList.add('d-none');
+                document.getElementById('balCadastro').classList.add('d-none');
+                document.getElementById('balPasso3').classList.remove('d-none');
+                await carregar();
+            } catch (e) {
+                balErro(e.message);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function carregar() {
+            const p = new URLSearchParams({
+                q: document.getElementById('filtroBusca').value.trim(),
+                status: document.getElementById('filtroStatus').value,
+                prioridade: document.getElementById('filtroPrioridade').value,
+                minDias: document.getElementById('filtroEspera').value
+            });
+            try {
+                const r = await api('api/painel/solicitacoes?' + p);
+                solicitacoes = r.solicitacoes;
+                desenharResumo();
+                desenhar();
+                aviso('');
+            } catch (e) {
+                aviso(e.message, 'danger');
+            }
+        }
+
+        function desenharResumo() {
+            const abertos = solicitacoes.filter(s => ABERTOS.includes(s.status));
+            const dias = abertos.map(s => s.diasEspera);
+            const media = dias.length ? Math.round(dias.reduce((a, b) => a + b, 0) / dias.length) : null;
+            const maior = dias.length ? Math.max(...dias) : null;
+            const cartoes = [
+                ['Em aberto', abertos.length, 'bi-hourglass-split', ''],
+                ['Espera média (em aberto)', media === null ? '—' : textoDias(media), 'bi-stopwatch', ''],
+                ['Maior espera (em aberto)', maior === null ? '—' : textoDias(maior), 'bi-hourglass-bottom',
+                    maior === null ? '' : '#' + abertos[dias.indexOf(maior)].protocolo],
+                ['Urgentes em aberto (interno)', abertos.filter(s => s.prioridade === 'URGENTE').length, 'bi-sort-up',
+                    abertos.filter(s => s.prioridade === 'PRIORITARIO').length + ' prioritário(s)']
+            ];
+            document.getElementById('resumo').innerHTML = cartoes.map(([rotulo, valor, icone, detalhe]) => `
+                <div class="col-6 col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+                    <div class="small text-muted"><i class="bi ${icone} me-1"></i>${rotulo}</div>
+                    <div class="cartao-numero">${esc(valor)}</div>
+                    ${detalhe ? `<div class="small text-muted">${esc(detalhe)}</div>` : ''}
+                </div></div></div>`).join('');
+        }
+
+        function celulaEspera(s) {
+            if (ABERTOS.includes(s.status)) {
+                return `<span class="badge ${corEspera(s.diasEspera)} fs-6">${textoDias(s.diasEspera)}</span><div class="small text-muted">esperando</div>`;
+            }
+            return `<span class="badge bg-light text-dark border">${textoDias(s.diasEspera)}</span>` +
+                `<div class="small text-muted">${s.status === 'AGENDADA' ? 'até a marcação' : 'tempo total'}</div>`;
+        }
+
+        // WhatsApp (demonstração): "clique para conversar" (wa.me) com a mensagem pronta; o envio é manual.
+        function linkWhatsApp(s) {
+            const tel = String(s.telefone || '').replace(/\D/g, '');
+            if (tel.length < 10 || tel.length > 11) return null;
+            const texto = [
+                `Olá, ${String(s.paciente).split(' ')[0]}! Aqui é da Secretaria Municipal de Saúde de Cidade Ocidental (Agiliza Saúde).`,
+                '',
+                `Seu pedido *#${s.protocolo}* (${s.servico}) está: *${s.statusRotulo}*.`,
+                s.mensagemPublica || '',
+                '',
+                'Acompanhe pelo site digitando o seu CPF em "Acompanhar Solicitação".'
+            ].join('\n');
+            return 'https://wa.me/55' + tel + '?text=' + encodeURIComponent(texto);
+        }
+
+        function desenhar() {
+            const corpo = document.getElementById('corpoTabela');
+            if (!solicitacoes.length) {
+                corpo.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">Nenhuma solicitação encontrada.</td></tr>';
+                return;
+            }
+            corpo.innerHTML = solicitacoes.map((s, i) => `
+                <tr class="${ABERTOS.includes(s.status) && s.diasEspera >= 30 ? 'table-danger' : ''}">
+                    <td><span class="badge ${COR_PRIORIDADE[s.prioridade] || 'bg-secondary'}">${esc(s.prioridadeRotulo)}</span>
+                        ${s.prioridadeMotivo ? `<div class="small text-muted">${esc(s.prioridadeMotivo)}</div>` : ''}
+                        ${s.idade >= 60 && s.prioridade === 'NORMAL' ? `<div class="small text-warning-emphasis"><i class="bi bi-info-circle me-1"></i>${s.idade} anos</div>` : ''}</td>
+                    <td class="fw-bold">#${esc(s.protocolo)}${s.canal === 'BALCAO'
+                        ? `<div><span class="badge bg-success-subtle text-success-emphasis fw-normal" title="Registrado por ${esc(s.criadoPor || '')}">Balcão</span></div>` : ''}</td>
+                    <td>${esc(s.paciente)}<div class="small text-muted">CPF ${esc(mascararCpf(s.cpf))} • SUS ${esc(mascararSus(s.cartaoSus) || '—')} • ${esc(s.telefone || 'sem telefone')}</div></td>
+                    <td>${esc(s.servico)}${s.cirurgiaProcedimento ? `<div class="small text-primary">${esc(s.cirurgiaProcedimento)} • ${esc(s.cirurgiaHospital)}</div>
+                        <div class="small text-muted">Pré-operatório: ${Object.values(s.preOp || {}).filter(Boolean).length} de 4</div>` : ''}</td>
+                    <td>${esc(s.ubs)}</td>
+                    <td><span class="badge ${COR_STATUS[s.status] || 'bg-secondary'}">${esc(s.statusRotulo)}</span>
+                        ${s.agendaData ? `<div class="small text-primary mt-1"><i class="bi bi-calendar-check me-1"></i>${dataBr(s.agendaData)} ${esc(s.agendaHora)}
+                            ${s.agendaProfissional ? '• ' + esc(s.agendaProfissional) : ''}</div>` : ''}
+                        <div class="small text-muted mt-1">atualizado ${esc(formatarData(s.atualizadoEm))}</div></td>
+                    <td class="small text-nowrap">${esc(formatarData(s.criadoEm))}</td>
+                    <td class="text-nowrap">${celulaEspera(s)}</td>
+                    <td class="text-end text-nowrap">
+                        ${linkWhatsApp(s) ? `<a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener"
+                              href="${esc(linkWhatsApp(s))}" title="Avisar pelo WhatsApp"><i class="bi bi-whatsapp"></i></a>` : ''}
+                        ${s.temAnexo ? `<a class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener"
+                              href="api/painel/anexo?id=${s.id}" title="Ver anexo"><i class="bi bi-paperclip"></i></a>` : ''}
+                        <button class="btn btn-sm btn-primary" onclick="abrirModal(${i})">
+                            <i class="bi bi-pencil-square me-1"></i>Atualizar
+                        </button>
+                    </td>
+                </tr>`).join('');
+        }
+
+        function abrirModal(i) {
+            selecionada = solicitacoes[i];
+            document.getElementById('resumoModal').innerHTML =
+                `<strong>#${esc(selecionada.protocolo)}</strong> — ${esc(selecionada.paciente)} (${selecionada.idade} anos)<br>` +
+                `<span class="text-muted">${esc(selecionada.servico)} • pedido em ${esc(formatarData(selecionada.criadoEm))} • espera: ${textoDias(selecionada.diasEspera)}</span>`;
+            document.getElementById('novaPrioridade').value = selecionada.prioridade;
+            document.getElementById('motivoPrioridade').value = selecionada.prioridadeMotivo || '';
+            document.getElementById('infoPrioridade').textContent = selecionada.prioridadePor
+                ? `Definida por ${selecionada.prioridadePor} em ${formatarData(selecionada.prioridadeEm)}.`
+                : (selecionada.idade >= 60 ? `Paciente com ${selecionada.idade} anos: tem prioridade legal.` : 'Prioridade ainda não definida (Normal).');
+            document.getElementById('novoStatus').value = selecionada.status;
+            // cirurgia eletiva: checklist do pré-operatório
+            const temCir = !!selecionada.cirurgiaProcedimento;
+            document.getElementById('cirurgiaModal').classList.toggle('d-none', !temCir);
+            if (temCir) {
+                document.getElementById('cirurgiaTitulo').textContent = 'Cirurgia: ' + selecionada.cirurgiaProcedimento + ' • ' + selecionada.cirurgiaHospital;
+                const p = selecionada.preOp || {};
+                document.getElementById('mPreExames').checked = !!p.exames;
+                document.getElementById('mPreRisco').checked = !!p.riscoCirurgico;
+                document.getElementById('mPreTermo').checked = !!p.termo;
+                document.getElementById('mPreOrientado').checked = !!p.orientado;
+            }
+            document.getElementById('msgPublica').value = '';
+            document.getElementById('obsInterna').value = '';
+            document.getElementById('erroModal').classList.add('d-none');
+            // marcar na agenda: médico -> dia -> horário (a vaga atual, se houver, não aparece como opção)
+            const temVaga = selecionada.agendaId != null;
+            const agAtual = temVaga ? agendas.find(a => a.id === selecionada.agendaId) : null;
+            montarSeletor('mk', selecionada.servicoId, temVaga ? { agendaId: selecionada.agendaId, vaga: selecionada.agendaVaga } : null,
+                agAtual ? (agAtual.profissionalId || 0) : null);
+            mostrarMarcacao();
+            modal.show();
+        }
+
+        function mostrarMarcacao() {
+            document.getElementById('blocoMarcar').classList.toggle('d-none', document.getElementById('novoStatus').value !== 'AGENDADA');
+        }
+
+        /** Salva o que mudou: prioridade (interna) e/ou status. */
+        async function salvar() {
+            const erro = document.getElementById('erroModal');
+            const btn = document.getElementById('btnSalvar');
+            const prioridade = document.getElementById('novaPrioridade').value;
+            const motivo = document.getElementById('motivoPrioridade').value.trim();
+            const status = document.getElementById('novoStatus').value;
+            const msg = document.getElementById('msgPublica').value;
+            const obs = document.getElementById('obsInterna').value;
+            const mudouPrioridade = prioridade !== selecionada.prioridade || motivo !== (selecionada.prioridadeMotivo || '');
+            const mudouStatus = status !== selecionada.status || msg.trim() || obs.trim();
+            let preOpNovo = null;
+            if (selecionada.cirurgiaProcedimento) {
+                preOpNovo = {
+                    exames: document.getElementById('mPreExames').checked, riscoCirurgico: document.getElementById('mPreRisco').checked,
+                    termo: document.getElementById('mPreTermo').checked, orientado: document.getElementById('mPreOrientado').checked
+                };
+            }
+            const p0 = selecionada.preOp || {};
+            const mudouPreOp = !!preOpNovo && ['exames', 'riscoCirurgico', 'termo', 'orientado'].some(k => !!p0[k] !== preOpNovo[k]);
+            // Agendada: a marcação é feita pela agenda (quem atende, dia e horário certos)
+            const vaga = status === 'AGENDADA' ? lerSeletor('mk') : null;
+            if (status === 'AGENDADA' && !vaga && selecionada.status !== 'AGENDADA') {
+                erro.textContent = 'Para marcar, escolha quem vai atender, o dia e o horário.';
+                erro.classList.remove('d-none');
+                return;
+            }
+            btn.disabled = true;
+            try {
+                if (vaga) {
+                    const r = await postJson('api/painel/agendas/marcar',
+                        { agendaId: vaga.agenda.id, marcacoes: [{ numero: vaga.n, solicitacaoId: selecionada.id }] });
+                    if (r.erros.length) throw new Error(r.erros.join(' '));
+                }
+                if (mudouPreOp) {
+                    await postJson('api/painel/balcao/preop', Object.assign({ id: selecionada.id }, preOpNovo));
+                }
+                if (mudouPrioridade) {
+                    await postJson('api/painel/solicitacoes/prioridade', { id: selecionada.id, prioridade, motivo });
+                }
+                // "Agendada" sem texto extra: a marcação já gravou o status com a mensagem de dia/hora/médico
+                const jaGravado = status === 'AGENDADA' && !msg.trim() && !obs.trim() && (vaga || selecionada.status === 'AGENDADA');
+                if (mudouStatus && !jaGravado) {
+                    await postJson('api/painel/solicitacoes/status',
+                        { id: selecionada.id, status, mensagemPublica: msg, observacao: obs });
+                }
+                modal.hide();
+                await carregar();
+                if (vaga || (selecionada.agendaId != null && status !== 'AGENDADA')) carregarAgendas();
+                if (mudouPrioridade || mudouStatus || mudouPreOp || vaga) aviso('Solicitação #' + selecionada.protocolo + ' atualizada.' +
+                    (vaga ? ' Marcado: ' + textoMarcacao(vaga.agenda, vaga.n) + '.' : ''), 'success');
+            } catch (e) {
+                erro.textContent = e.message;
+                erro.classList.remove('d-none');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function sair() {
+            try {
+                await fetch('api/auth/logout', { method: 'POST', headers: { 'X-Requested-With': 'fetch' } });
+            } finally {
+                window.location.href = 'index.html';
+            }
+        }
+
+        // cadastro novo no balcão: sugere a prioridade legal pela idade digitada
+        document.getElementById('balNasc').addEventListener('change', function () {
+            const n = new Date(this.value + 'T00:00:00');
+            const h = new Date();
+            let anos = h.getFullYear() - n.getFullYear();
+            if (h.getMonth() < n.getMonth() || (h.getMonth() === n.getMonth() && h.getDate() < n.getDate())) anos--;
+            balSugerirPrioridade(anos);
+        });
+
+        iniciar().catch(() => { /* redirecionamento ja tratado em api() */ });
+    </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "anexos",
+      "fieldPath": "dados",
+      "indexes": []
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Agiliza Saúde</title>
+  <defs>
+    <linearGradient id="fundo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a3d62"/>
+      <stop offset="1" stop-color="#0077c2"/>
+    </linearGradient>
+    <linearGradient id="pulso" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#00a8ff"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+
+  <!-- fundo -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#fundo)"/>
+
+  <!-- linhas de velocidade (agilidade) -->
+  <g stroke="#ffffff" stroke-linecap="round" fill="none">
+    <line x1="58" y1="214" x2="118" y2="214" stroke-width="18" opacity="0.9"/>
+    <line x1="40" y1="262" x2="104" y2="262" stroke-width="18" opacity="0.6"/>
+    <line x1="62" y1="310" x2="112" y2="310" stroke-width="18" opacity="0.35"/>
+  </g>
+
+  <!-- coração -->
+  <path d="M276 420 C 150 338, 110 266, 140 202 C 168 142, 240 136, 276 190 C 312 136, 384 142, 412 202 C 442 266, 402 338, 276 420 Z"
+        fill="#ffffff"/>
+
+  <!-- batimento cardíaco -->
+  <polyline points="150,268 222,268 244,226 270,322 300,196 324,268 404,268"
+            fill="none" stroke="url(#pulso)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- marca de confirmação (pedido aprovado) -->
+  <circle cx="398" cy="128" r="54" fill="#10b981" stroke="#ffffff" stroke-width="10"/>
+  <polyline points="373,128 391,146 425,110" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
